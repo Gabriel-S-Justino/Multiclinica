@@ -1,0 +1,77 @@
+The files belonging to this database system will be owned by user "Cleber".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory C:/Users/Cleber/Documents/projetoExtensao/.local/pg-test-vdimkt1r/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... windows
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Sao_Paulo
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    ^"C^:^\Users^\Cleber^\Documents^\projetoExtensao^\^.tools^\pg^\node^_modules^\^@embedded^-postgres^\windows^-x64^\native^\bin^\pg^_ctl^" -D ^"C^:^\Users^\Cleber^\Documents^\projetoExtensao^\^.local^\pg^-test^-vdimkt1r^\data^" -l logfile start
+
+waiting for server to start.... done
+server started
+PostgreSQL real: PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\Users\Cleber\Documents\projetoExtensao
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, hypothesis-6.170.14, platformdirs-4.14.2
+collected 77 items
+
+tests\integration\test_foundation.py ...............                     [ 19%]
+tests\integration\test_scheduling.py ..................................  [ 63%]
+tests\unit\test_scheduling.py ...............                            [ 83%]
+tests\unit\test_security.py .............                                [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\Cleber\Documents\projetoExtensao\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: C:\Users\Cleber\Documents\projetoExtensao\.local\pytest.xml -
+================== 77 passed, 1 warning in 85.77s (0:01:25) ===================
+
+> clinic-portal@0.1.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [6536]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] {"correlation_id": "c1104662-5645-4c2e-8b48-a8671bd5210b", "method": "GET", "status": 200, "duration_ms": 2}
+[WebServer] (node:23408) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:22664) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"correlation_id": "02b55047-08f6-41cf-8a05-4e1903bce336", "method": "GET", "status": 401, "duration_ms": 2}
+[WebServer] {"correlation_id": "89de28d3-48b5-40b5-8850-7e9beb33e427", "method": "POST", "status": 200, "duration_ms": 229}
+[WebServer] {"correlation_id": "cf623e54-186a-46fc-93fd-96a90673438b", "method": "GET", "status": 200, "duration_ms": 58}
+[WebServer] {"correlation_id": "19ce27aa-0486-4cd5-96ce-ff8df2b4bf16", "method": "POST", "status": 200, "duration_ms": 59}
+[WebServer] {"correlation_id": "a2cd4c63-fc6e-4a2d-87f2-07ac8f711423", "method": "GET", "status": 200, "duration_ms": 159}
+[WebServer] {"correlation_id": "4efa7a58-dab3-4f55-a304-b1dcd314a51d", "method": "GET", "status": 200, "duration_ms": 57}
+[WebServer] {"correlation_id": "ecbf0bd9-936d-447e-b931-c52f0c9a2cde", "method": "POST", "status": 204, "duration_ms": 47}
+[WebServer] {"correlation_id": "3b9bed91-1c0f-4635-bdb9-b7a686b1b7f9", "method": "GET", "status": 401, "duration_ms": 1}
+  ok 1 e2e\foundation.spec.ts:4:1 › login, seleção de clínica, escopo profissional e logout com backend real (1.7s)
+
+  1 passed (6.7s)
+Migration upgrade / existing data / downgrade / upgrade: PASS
+waiting for server to shut down...... done
+server stopped

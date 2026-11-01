@@ -1,0 +1,63 @@
+RELEASE — verificação local — 31/10/2026
+
+Comando: ruff check backend tests scripts
+All checks passed!
+Resultado: PASS
+
+Comando: ruff format --check backend tests scripts
+70 files already formatted
+Resultado: PASS
+
+Comando: mypy backend
+Success: no issues found in 52 source files
+Resultado: PASS
+
+Comando: bandit -r backend -q
+Resultado: PASS
+
+Comando: python scripts/check_secrets.py
+Arquivos examinados: 164; poss�veis segredos: 0
+Resultado: PASS
+
+Comando: npm --prefix frontend run lint
+
+> clinic-portal@0.1.0 lint
+> eslint . --max-warnings=0
+
+Resultado: PASS
+
+Comando: npm --prefix frontend run build
+
+> clinic-portal@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 78 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.36 kB │ gzip:   0.27 kB
+dist/assets/index-B3SNyHEF.css   16.55 kB │ gzip:   4.41 kB
+dist/assets/index-BnN6ICfl.js   361.08 kB │ gzip: 108.77 kB
+
+✓ built in 478ms
+Resultado: PASS
+
+Comando: npm --prefix frontend test
+
+> clinic-portal@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.5 C:/Users/Cleber/Documents/projetoExtensao/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  23:09:06
+   Duration  3.60s (environment 66%, import 11%, tests 10%, setup 9%, transform 4%)
+
+Resultado: PASS
+
+Comando: git diff --check
+Resultado: PASS

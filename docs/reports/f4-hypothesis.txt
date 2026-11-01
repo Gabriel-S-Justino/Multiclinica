@@ -1,0 +1,14 @@
+tests/unit/test_scheduling.py::test_overlap_is_symmetric_and_half_open:
+
+  - during generate phase (0.11 seconds):
+    - Typical runtimes: < 1ms, of which < 1ms in data generation
+    - 100 passing, 0 failing, and 0 invalid test cases
+
+  - Stopped because settings.max_examples=100
+tests/unit/test_scheduling.py::test_slots_respect_duration_buffers_and_busy_intervals:
+
+  - during generate phase (0.39 seconds):
+    - Typical runtimes: ~ 0-14 ms, of which < 1ms in data generation
+    - 100 passing, 0 failing, and 0 invalid test cases
+
+  - Stopped because settings.max_examples=100

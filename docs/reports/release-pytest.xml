@@ -1,0 +1,161 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="148" time="159.291" timestamp="2026-10-31T23:06:17.245758-03:00" hostname="DESKTOP-JRD0MIN">
+    <properties />
+    <testcase classname="tests.integration.test_ai_quota" name="test_atomic_monthly_quota_and_idempotent_settlement" time="1.257" />
+    <testcase classname="tests.integration.test_ai_quota" name="test_quota_replay_and_tenant_isolation" time="0.576" />
+    <testcase classname="tests.integration.test_foundation" name="test_endpoint_rbac_and_tenant_isolation[admin-visible0]" time="1.646" />
+    <testcase classname="tests.integration.test_foundation" name="test_endpoint_rbac_and_tenant_isolation[collaborator-visible1]" time="1.321" />
+    <testcase classname="tests.integration.test_foundation" name="test_endpoint_rbac_and_tenant_isolation[reception-visible2]" time="1.147" />
+    <testcase classname="tests.integration.test_foundation" name="test_endpoint_rbac_and_tenant_isolation[superadmin-visible3]" time="1.527" />
+    <testcase classname="tests.integration.test_foundation" name="test_csrf_rotation_revocation_and_tenant_input" time="1.370" />
+    <testcase classname="tests.integration.test_foundation" name="test_revoked_membership_and_expiration" time="1.121" />
+    <testcase classname="tests.integration.test_foundation" name="test_rls_absent_context_connection_reuse_and_audit_immutable" time="1.230" />
+    <testcase classname="tests.integration.test_foundation" name="test_cross_tenant_fk_rejected" time="0.533" />
+    <testcase classname="tests.integration.test_foundation" name="test_rls_rejects_foreign_audit_insert" time="0.748" />
+    <testcase classname="tests.integration.test_foundation" name="test_startup_rejects_privileged_database_role" time="0.684" />
+    <testcase classname="tests.integration.test_foundation" name="test_login_errors_uniform_rate_limit_persisted_and_safe_logs" time="2.816" />
+    <testcase classname="tests.integration.test_foundation" name="test_rate_limit_is_atomic" time="0.926" />
+    <testcase classname="tests.integration.test_foundation" name="test_mfa_cookie_flags_replay_and_audit_permission" time="2.235" />
+    <testcase classname="tests.integration.test_foundation" name="test_recovery_single_use_revokes_sessions" time="1.627" />
+    <testcase classname="tests.integration.test_foundation" name="test_payload_cors_security_headers_and_readiness" time="0.717" />
+    <testcase classname="tests.integration.test_messaging" name="test_webhook_auth_before_parse_routing_and_persistent_dedup" time="1.377" />
+    <testcase classname="tests.integration.test_messaging" name="test_whatsapp_real_domain_booking_and_duplicate_confirmation" time="3.169" />
+    <testcase classname="tests.integration.test_messaging" name="test_old_option_and_out_of_order_message_cannot_book" time="1.699" />
+    <testcase classname="tests.integration.test_messaging" name="test_handoff_silence_media_and_opt_out" time="1.720" />
+    <testcase classname="tests.integration.test_messaging" name="test_contact_worker_identity_cannot_release_other_contacts_hold" time="1.039" />
+    <testcase classname="tests.integration.test_messaging" name="test_outbox_window_consent_and_unknown_no_resend[success]" time="1.560" />
+    <testcase classname="tests.integration.test_messaging" name="test_outbox_window_consent_and_unknown_no_resend[ambiguous]" time="1.167" />
+    <testcase classname="tests.integration.test_messaging" name="test_outbox_window_consent_and_unknown_no_resend[closed_window]" time="0.944" />
+    <testcase classname="tests.integration.test_messaging" name="test_outbox_window_consent_and_unknown_no_resend[opted_out]" time="1.309" />
+    <testcase classname="tests.integration.test_messaging" name="test_outbox_window_consent_and_unknown_no_resend[disabled]" time="1.239" />
+    <testcase classname="tests.integration.test_messaging" name="test_parallel_ingest_and_process_has_one_effect" time="1.379" />
+    <testcase classname="tests.integration.test_messaging" name="test_verified_contact_manages_appointment_via_explicit_options[cancel]" time="4.146" />
+    <testcase classname="tests.integration.test_messaging" name="test_verified_contact_manages_appointment_via_explicit_options[reschedule]" time="5.335" />
+    <testcase classname="tests.integration.test_messaging" name="test_delivery_callbacks_do_not_regress_read_state" time="1.720" />
+    <testcase classname="tests.integration.test_messaging" name="test_manual_identity_is_required_without_enumeration" time="1.588" />
+    <testcase classname="tests.integration.test_messaging" name="test_inactivity_reconfirms_and_expired_hold_does_not_confirm" time="3.106" />
+    <testcase classname="tests.integration.test_messaging" name="test_webhook_load_sample_durable_ack" time="2.404">
+      <properties>
+        <property name="webhook_local_requests" value="100" />
+        <property name="webhook_local_workers" value="10" />
+        <property name="webhook_local_p95_ms" value="247.34" />
+        <property name="webhook_local_max_ms" value="281.58" />
+      </properties>
+    </testcase>
+    <testcase classname="tests.integration.test_messaging" name="test_idempotency_receipt_is_bound_to_contact_before_replay" time="1.036" />
+    <testcase classname="tests.integration.test_messaging" name="test_revoked_service_actor_cannot_read_patient_flow" time="1.219" />
+    <testcase classname="tests.integration.test_messaging" name="test_unit_menu_is_bounded_and_paginated" time="1.814" />
+    <testcase classname="tests.integration.test_portal" name="test_read_endpoint_role_matrix[admin]" time="3.251" />
+    <testcase classname="tests.integration.test_portal" name="test_read_endpoint_role_matrix[reception]" time="3.029" />
+    <testcase classname="tests.integration.test_portal" name="test_read_endpoint_role_matrix[collaborator]" time="2.868" />
+    <testcase classname="tests.integration.test_portal" name="test_read_endpoint_role_matrix[superadmin]" time="3.729" />
+    <testcase classname="tests.integration.test_portal" name="test_http_booking_review_verification_reschedule_and_cancel" time="3.430" />
+    <testcase classname="tests.integration.test_portal" name="test_service_crud_versions_and_request_idempotency" time="1.681" />
+    <testcase classname="tests.integration.test_portal" name="test_financial_service_routes_to_queue_without_clinical_defaults" time="2.168" />
+    <testcase classname="tests.integration.test_portal" name="test_http_tenant_professional_idor_and_cursor_scope" time="4.752" />
+    <testcase classname="tests.integration.test_portal" name="test_schedule_permission_grant_and_exception_block_crud" time="3.110" />
+    <testcase classname="tests.integration.test_portal" name="test_last_admin_and_csrf_idempotency_header_guards" time="1.728" />
+    <testcase classname="tests.integration.test_portal" name="test_recent_mfa_is_required_for_configuration" time="1.568" />
+    <testcase classname="tests.integration.test_portal" name="test_integration_write_only_cipher_and_secret_aware_idempotency" time="2.344" />
+    <testcase classname="tests.integration.test_portal" name="test_inbox_concurrent_claim_reply_idempotency_and_return_to_bot" time="3.268" />
+    <testcase classname="tests.integration.test_portal" name="test_queue_assignment_is_required_even_for_clinic_admin" time="1.851" />
+    <testcase classname="tests.integration.test_portal" name="test_break_glass_approval_scoped_read_expiry_and_immutable_audit" time="3.356" />
+    <testcase classname="tests.integration.test_portal" name="test_platform_operator_registration_is_independent_of_membership_role" time="1.411" />
+    <testcase classname="tests.integration.test_portal" name="test_invitation_requires_recipient_consent_and_does_not_enumerate_accounts" time="2.207" />
+    <testcase classname="tests.integration.test_scheduling" name="test_availability_and_pagination" time="0.947" />
+    <testcase classname="tests.integration.test_scheduling" name="test_unvalidated_policy_blocks_booking" time="1.086" />
+    <testcase classname="tests.integration.test_scheduling" name="test_holiday_exception_and_block" time="1.158" />
+    <testcase classname="tests.integration.test_scheduling" name="test_fifty_simultaneous_holds_have_one_winner" time="5.123" />
+    <testcase classname="tests.integration.test_scheduling" name="test_fifty_simultaneous_confirmations_create_one_appointment" time="2.448" />
+    <testcase classname="tests.integration.test_scheduling" name="test_idempotency_replays_and_rejects_different_payload" time="1.249" />
+    <testcase classname="tests.integration.test_scheduling" name="test_shared_resource_blocks_other_professional_and_is_released" time="1.298" />
+    <testcase classname="tests.integration.test_scheduling" name="test_mandatory_resource_cannot_be_omitted" time="1.222" />
+    <testcase classname="tests.integration.test_scheduling" name="test_confirm_consumes_hold_and_atomically_finishes_conversation" time="1.359" />
+    <testcase classname="tests.integration.test_scheduling" name="test_stale_conversation_rolls_back_patient_and_booking" time="1.162" />
+    <testcase classname="tests.integration.test_scheduling" name="test_new_patient_is_encrypted_and_not_automatically_verified" time="1.219" />
+    <testcase classname="tests.integration.test_scheduling" name="test_expired_hold_does_not_require_cleanup_job" time="1.068" />
+    <testcase classname="tests.integration.test_scheduling" name="test_hold_confirmation_revalidates_changed_schedule" time="1.386" />
+    <testcase classname="tests.integration.test_scheduling" name="test_overlapping_reschedule_is_atomic_and_transfers_resource" time="1.572" />
+    <testcase classname="tests.integration.test_scheduling" name="test_failed_reschedule_preserves_original" time="1.477" />
+    <testcase classname="tests.integration.test_scheduling" name="test_cancel_releases_slot_and_terminal_transition_is_denied" time="1.654" />
+    <testcase classname="tests.integration.test_scheduling" name="test_least_future_load_uses_future_active_duration" time="1.201" />
+    <testcase classname="tests.integration.test_scheduling" name="test_least_future_load_does_not_penalize_completed_history" time="1.290" />
+    <testcase classname="tests.integration.test_scheduling" name="test_clinic_policy_limits_are_enforced_without_default_business_values" time="1.303" />
+    <testcase classname="tests.integration.test_scheduling" name="test_duration_override_and_buffers_change_eligible_slots" time="1.190" />
+    <testcase classname="tests.integration.test_scheduling" name="test_scheduling_professional_permissions[collaborator-professional-True]" time="1.716" />
+    <testcase classname="tests.integration.test_scheduling" name="test_scheduling_professional_permissions[collaborator-other_professional-False]" time="1.251" />
+    <testcase classname="tests.integration.test_scheduling" name="test_scheduling_professional_permissions[reception-other_professional-False]" time="1.406" />
+    <testcase classname="tests.integration.test_scheduling" name="test_scheduling_professional_permissions[superadmin-professional-False]" time="0.992" />
+    <testcase classname="tests.integration.test_scheduling" name="test_hold_owner_cannot_be_impersonated" time="1.295" />
+    <testcase classname="tests.integration.test_scheduling" name="test_application_boundary_requires_mfa_when_configured" time="0.971" />
+    <testcase classname="tests.integration.test_scheduling" name="test_rls_idor_and_unverified_patient" time="1.578" />
+    <testcase classname="tests.integration.test_scheduling" name="test_direct_sql_cannot_create_overlapping_hold_or_extend_ttl" time="1.424" />
+    <testcase classname="tests.integration.test_scheduling" name="test_register_contact_is_minimal_encrypted_and_idempotent" time="0.896" />
+    <testcase classname="tests.integration.test_scheduling" name="test_failure_after_booking_writes_rolls_back_every_effect" time="1.290" />
+    <testcase classname="tests.integration.test_scheduling" name="test_reschedule_failure_after_writes_preserves_old_and_hold" time="2.004" />
+    <testcase classname="tests.integration.test_scheduling" name="test_cancellation_remains_possible_after_service_deactivation" time="1.337" />
+    <testcase classname="tests.integration.test_scheduling" name="test_runtime_sql_resource_overlap_is_rejected" time="1.349" />
+    <testcase classname="tests.integration.test_scheduling" name="test_fifty_direct_sql_inserts_are_serialized_by_database_trigger" time="2.160" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload0]" time="0.002" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload1]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload2]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload3]" time="0.002" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload4]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload5]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_adversarial_outputs_never_invoke_mutations[payload6]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[meu email \xe9 a@test.invalid]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[telefone 11999999999]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[CPF 12345678900]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[veja https://example.invalid]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[tenho dor]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[falta de ar]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_sensitive_and_clinical_inputs_never_reach_provider[\xe9 emerg\xeancia]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_model_cannot_authorize_action_in_sensitive_state[REVIEW]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_model_cannot_authorize_action_in_sensitive_state[CANCEL]" time="0.002" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_model_cannot_authorize_action_in_sensitive_state[MANAGE]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_model_cannot_authorize_action_in_sensitive_state[HUMAN_HANDOFF]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_model_cannot_authorize_action_in_sensitive_state[NAME]" time="0.001" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_disabled_and_quota_degrade_without_provider_call" time="0.000" />
+    <testcase classname="tests.unit.test_ai_boundary" name="test_enabled_incomplete_config_fails_closed" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_overlap_is_symmetric_and_half_open" time="0.103" />
+    <testcase classname="tests.unit.test_scheduling" name="test_slots_respect_duration_buffers_and_busy_intervals" time="0.562" />
+    <testcase classname="tests.unit.test_scheduling" name="test_nonexistent_or_ambiguous_wall_time_is_not_offered[day0-150]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_nonexistent_or_ambiguous_wall_time_is_not_offered[day1-90]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_adjacent_appointments_are_not_conflicts" time="0.000" />
+    <testcase classname="tests.unit.test_scheduling" name="test_terminal_or_backward_transition_is_denied[completed-scheduled]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_terminal_or_backward_transition_is_denied[canceled-confirmed]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_terminal_or_backward_transition_is_denied[confirmed-scheduled]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_terminal_or_backward_transition_is_denied[rescheduled-completed]" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_completion_before_start_is_denied" time="0.001" />
+    <testcase classname="tests.unit.test_scheduling" name="test_encrypted_field_is_bound_to_tenant_row_and_field" time="0.002" />
+    <testcase classname="tests.unit.test_scheduling" name="test_sensitive_commands_reject_free_tenant_and_naive_time" time="0.000" />
+    <testcase classname="tests.unit.test_scheduling" name="test_availability_window_is_bounded" time="0.000" />
+    <testcase classname="tests.unit.test_scheduling" name="test_least_future_load_orders_load_then_time_then_stable_id" time="0.000" />
+    <testcase classname="tests.unit.test_scheduling" name="test_birth_date_uses_clinic_day_at_utc_midnight_boundary" time="0.000" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides0]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides1]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides2]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides3]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides4]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_configuration_fails_closed[overrides5]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_password_and_token_storage" time="0.321" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[collaborator-True-False-True]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[collaborator-False-True-False]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[reception-False-True-True]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[reception-False-False-False]" time="0.001" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[admin-False-False-True]" time="0.002" />
+    <testcase classname="tests.unit.test_security" name="test_professional_permission_matrix[superadmin-False-True-False]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_signature_is_over_exact_raw_bytes" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[200-payload0-None-False-False]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[200-payload1-delivery_unknown-False-True]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[429-payload2-provider_throttled-True-False]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[500-payload3-delivery_unknown-False-True]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[400-payload4-provider_rejected-False-False]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_cloud_adapter_fixed_endpoint_payload_and_failure_classification[302-payload5-provider_rejected-False-False]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_network_error_is_ambiguous" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_configuration_cannot_select_another_host_or_recipient_scheme[https://foreign.invalid-100-+15550000000]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_configuration_cannot_select_another_host_or_recipient_scheme[v1.0-../foreign-+15550000000]" time="0.001" />
+    <testcase classname="tests.unit.test_whatsapp_provider" name="test_configuration_cannot_select_another_host_or_recipient_scheme[v1.0-100-https://foreign.invalid]" time="0.001" />
+  </testsuite>
+</testsuites>

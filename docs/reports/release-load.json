@@ -1,0 +1,7 @@
+{
+  "scope": "Webhook local via TestClient e PostgreSQL real; sem provedor externo; não mede infraestrutura remota",
+  "webhook_local_requests": "100",
+  "webhook_local_workers": "10",
+  "webhook_local_p95_ms": "247.34",
+  "webhook_local_max_ms": "281.58"
+}
