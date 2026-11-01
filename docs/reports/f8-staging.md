@@ -26,6 +26,14 @@ Foi preparada a configuração do mesmo projeto isolado para esse canal, mantend
 
 A aprovação necessária cobre gravar as seis variáveis da aplicação e fazer o primeiro deploy no canal Production **somente** de `clbrfrancaa/projeto-extensao-staging`, com a URL reservada deste staging. Isso não implica habilitar WhatsApp, IA, dados reais ou uma produção clínica. A continuidade de implementação permanece autorizada; esta aprovação específica é exigida pela revisão automática para o canal remoto diferente.
 
+## Primeiro deploy e ajuste dos arquivos estáticos
+
+O usuário aprovou especificamente o canal Production deste projeto isolado. As seis variáveis foram configuradas nesse canal com `APP_ENV=staging`; o primeiro deploy do commit `65fe8f2cf825` atingiu READY. A URL fixa respondeu `200` em `/v1/health` e `/v1/ready`, com sessão anônima rejeitada em `/v1/auth/session` (`401`). A URL imutável do deploy preservou a proteção da Vercel. Não houve desativação de proteção.
+
+A página inicial retornou 404. Os logs comprovaram Python 3.12, instalação de dependências e build Vite executados, mas `public` constava da exclusão de publicação. A exclusão foi removida para permitir o CDN da Vercel; o preparador passou a remover apenas assets gerados obsoletos, validando os caminhos antes da remoção. O build local e a presença/hashes dos arquivos estáticos foram verificados antes do novo envio. O estado READY sozinho não foi tratado como validação ponta a ponta.
+
+Foi criada uma clínica de demonstração claramente identificada como sintética, com administrador de MFA e parâmetros exclusivos de teste. Credenciais aleatórias permanecem em arquivo privado local, sem envio ao chat. Nenhuma configuração foi interpretada como política real de clínica.
+
 ## Fontes
 
 Consultadas em 31/10/2026: [papéis Neon](https://github.com/neondatabase/website/blob/main/content/docs/manage/roles.md) — papéis criados por Console/API/CLI recebem `neon_superuser`; SQL permite papéis limitados; [acesso ao banco](https://github.com/neondatabase/website/blob/main/content/docs/manage/database-access.md); [regiões Vercel](https://vercel.com/docs/functions/configuring-functions/region); [referência de integração Vercel](https://vercel.com/docs/integrations/create-integration/vercel-api-integrations). Os limites do plano foram lidos da instalação real, sem upgrade ou contratação paga.
