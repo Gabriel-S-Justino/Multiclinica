@@ -1,6 +1,6 @@
 # Continuidade F5–F8
 
-31/10/2026. O usuário aprovou a F4 e autorizou seguir sem novos gates com "aprove tudo". A autorização foi registrada em ADR 0006; decisões clínicas/jurídicas, credenciais e escolha de contas continuam necessárias. Não houve push, deploy, contratação, envio WhatsApp ou chamada real de IA.
+31/10/2026. O usuário aprovou a F4 e autorizou seguir sem novos gates com "aprove tudo". A autorização foi registrada em ADR 0006. Posteriormente foi publicado e verificado um staging Vercel/Neon gratuito, com autorização específica para o canal remoto exigido. Decisões clínicas/jurídicas e configuração de provedores continuam necessárias. Não houve push, envio WhatsApp ou chamada real de IA. Veja o [resultado remoto da F8](f8-staging.md).
 
 ## Estado por fase
 
@@ -9,7 +9,7 @@
 | F5 | Webhook autenticado, deduplicação persistente, fila cifrada, worker serial, identidade técnica limitada ao contato, menus determinísticos, agendar/cancelar/remarcar, verificação manual, handoff, outbox, janela/opt-out, callbacks, retry/DLQ/unknown | Conta Meta, versão vigente, credenciais/configuração real e teste de entrega no destino; agendador com latência medida |
 | F6 | Contrato independente de provedor, schema fechado, intenções sem executor de mutações, filtro determinístico, modo degradado, reserva atômica de tokens por clínica/conversa, metadados sem prompts, suíte adversarial | Adaptador de provedor escolhido e sua ligação ao fluxo, contrato/região/política D13, orçamento monetário, texto clínico fixo aprovado, chamadas reais/qualidade/custo. IA desabilitada |
 | F7 | Análise estática, scans, auditorias atuais, testes de isolamento/concorrência/carga local, procedimento de privacidade/incidentes e ensaio de backup/restauração | Revisão clínica/jurídica, direitos/retenção automatizados, resolução de achados npm, carga e restauração no plano remoto; nenhuma certificação de conformidade |
-| F8 | Entrypoint e configuração Vercel, frontend estático, cabeçalhos, contrato OpenAPI e runbook de release/rollback | Contas/ambientes/domínio/plano/região, configuração privada e agendador; build remoto, staging, smoke/e2e e observação reais. Não implantado |
+| F8 | Staging Vercel/Neon publicado, runtime limitado, MFA, migrações, build remoto, HTTP e fluxo Chromium reais, acessibilidade desktop/mobile | Agendador/worker remoto, Meta/IA, carga/cold start, restauração no destino e critérios de produção clínica |
 
 ## Arquivos e decisões
 
@@ -35,4 +35,4 @@ O problema de concorrência do webhook encontrado durante os testes foi corrigid
 
 ## Próximas informações necessárias
 
-Identificar ambientes/contas Meta, Neon e Vercel e provedor de IA aprovado, sem enviar segredos pelo chat. Configurar valores privados no ambiente/secret manager. Responsáveis precisam fornecer políticas clínicas/identidade/retenção, texto de emergência e avaliação D13. A continuidade está autorizada; nenhuma nova aprovação genérica é necessária. Os itens dependentes permanecem pendentes até existir informação verificável.
+Identificar conta Meta e provedor de IA aprovado, sem enviar segredos pelo chat. Neon e Vercel já foram configurados para staging; valores privados da aplicação foram configurados sem credenciais administrativas no runtime. Responsáveis precisam fornecer políticas clínicas/identidade/retenção, texto de emergência e avaliação D13. A continuidade está autorizada; nenhuma nova aprovação genérica é necessária. Os itens dependentes permanecem pendentes até existir informação verificável.

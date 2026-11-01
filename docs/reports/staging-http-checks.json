@@ -1,0 +1,89 @@
+[
+  {
+    "base": "https://projeto-extensao-staging.vercel.app",
+    "path": "/",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "cache": "public, max-age=0, must-revalidate",
+    "nosniff": "nosniff",
+    "title": "Portal da cl\u00ednica"
+  },
+  {
+    "path": "/assets/index-BnN6ICfl.js",
+    "status": 200,
+    "content_type": "application/javascript; charset=utf-8",
+    "bytes": 361081,
+    "csp_self_only": true
+  },
+  {
+    "path": "/assets/index-B3SNyHEF.css",
+    "status": 200,
+    "content_type": "text/css; charset=utf-8",
+    "bytes": 16550,
+    "csp_self_only": true
+  },
+  {
+    "base": "https://projeto-extensao-staging.vercel.app",
+    "path": "/v1/health",
+    "status": 200,
+    "content_type": "application/json",
+    "cache": "no-store",
+    "nosniff": "nosniff",
+    "title": null,
+    "health_ok": true
+  },
+  {
+    "base": "https://projeto-extensao-staging.vercel.app",
+    "path": "/v1/ready",
+    "status": 200,
+    "content_type": "application/json",
+    "cache": "no-store",
+    "nosniff": "nosniff",
+    "title": null
+  },
+  {
+    "base": "https://projeto-extensao-staging.vercel.app",
+    "path": "/v1/auth/session",
+    "status": 401,
+    "content_type": "application/json",
+    "cache": "no-store",
+    "nosniff": "nosniff",
+    "title": null
+  },
+  {
+    "base": "https://projeto-extensao-staging-fe2iagb50-clbrfrancaa.vercel.app",
+    "path": "/",
+    "status": 302,
+    "content_type": "text/plain",
+    "cache": "no-store, max-age=0",
+    "nosniff": null,
+    "title": null
+  },
+  {
+    "base": "https://projeto-extensao-staging-fe2iagb50-clbrfrancaa.vercel.app",
+    "path": "/v1/health",
+    "status": 302,
+    "content_type": "text/plain",
+    "cache": "no-store, max-age=0",
+    "nosniff": null,
+    "title": null
+  },
+  {
+    "base": "https://projeto-extensao-staging-fe2iagb50-clbrfrancaa.vercel.app",
+    "path": "/v1/ready",
+    "status": 302,
+    "content_type": "text/plain",
+    "cache": "no-store, max-age=0",
+    "nosniff": null,
+    "title": null
+  },
+  {
+    "base": "https://projeto-extensao-staging-fe2iagb50-clbrfrancaa.vercel.app",
+    "path": "/v1/auth/session",
+    "status": 302,
+    "content_type": "text/plain",
+    "cache": "no-store, max-age=0",
+    "nosniff": null,
+    "title": null
+  }
+]

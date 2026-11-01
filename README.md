@@ -2,7 +2,7 @@
 
 Plataforma multi-clínica de atendimento por WhatsApp e gestão de agendamentos.
 
-Status: F0–F4 aprovadas. Continuidade F5–F8 autorizada; integração determinística validada localmente, guardrails/cotas de IA e hardening local implementados. Ativação externa, políticas pendentes e deploy real ainda não concluídos.
+Status: portal de demonstração publicado e verificado em [staging](https://projeto-extensao-staging.vercel.app), com Neon e MFA obrigatório. Login, agendamento, remarcação, cancelamento, atendimento humano e logout passaram no ambiente remoto com dados sintéticos. WhatsApp, IA e produção clínica permanecem pendentes de configuração e políticas aprovadas. [Evidências e limitações da F8](docs/reports/f8-staging.md).
 
 - [Escopo e requisitos](docs/requirements.md)
 - [Descoberta e perguntas](docs/discovery.md)

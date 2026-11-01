@@ -1,0 +1,31 @@
+{
+  "origin": "https://projeto-extensao-staging.vercel.app",
+  "started": "2026-11-01T02:57:40.692Z",
+  "checks": [
+    "MFA challenge required",
+    "MFA login",
+    "desktop_accessibility",
+    "review_accessibility",
+    "Remote booking committed",
+    "Synthetic relationship verified",
+    "Remote reschedule committed",
+    "Remote cancellation and persisted appointment states",
+    "Handoff claimed and reply queued without provider",
+    "Handoff released",
+    "Remote audit visible",
+    "mobile_accessibility",
+    "Logout revokes session and leaves localStorage empty"
+  ],
+  "apiErrors": [],
+  "desktop_accessibility": {
+    "violations": []
+  },
+  "review_accessibility": {
+    "violations": []
+  },
+  "mobile_accessibility": {
+    "violations": []
+  },
+  "success": true,
+  "finished": "2026-11-01T02:57:59.589Z"
+}

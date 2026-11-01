@@ -1,6 +1,6 @@
 # Deploy e verificação de capacidades
 
-Consulta de fontes oficiais: 31/10/2026. Nenhum ambiente provisionado, plano contratado verificado ou deploy executado.
+Estado atual em 31/10/2026: staging gratuito Vercel/Neon publicado e verificado com dados sintéticos e MFA obrigatório. Consulte o [relatório F8](reports/f8-staging.md) para recursos, evidências e limitações atuais. As seções seguintes preservam o design e as verificações históricas F1/F2; não descrevem o estado remoto atual.
 
 | Fonte oficial consultada | Evidência e consequência de design |
 |---|---|

@@ -1,4 +1,4 @@
-# F8 — preparação e verificação de staging
+# F8 — staging publicado e verificação remota
 
 Alvo confirmado: `clbrfrancaa/projeto-extensao-staging`, ID `prj_ncn1i5U1cQNjjLQxIeurJh54rtL1`, plano Hobby. Framework FastAPI, Node 24.x, Python 3.12 e região proposta de função `gru1`. Origem reservada verificada pela API: `https://projeto-extensao-staging.vercel.app`.
 
@@ -10,15 +10,15 @@ Papéis `clinic_migrator` e `clinic_runtime` foram criados por SQL, sem associa�
 
 A conexão automática da integração injetava credenciais de `neondb_owner`, que tem bypass de RLS. Depois de provisionar o banco e preparar os papéis, a injeção automática foi desconectada do projeto, preservando o recurso e os dados. O preview recebeu somente seis variáveis da aplicação: `APP_ENV=staging`, `PUBLIC_ORIGIN`, `MFA_REQUIRED=true` como configuração; `DATABASE_URL` do runtime, `TOKEN_KEY` e `FIELD_KEY` como Secret. Nenhuma URL de migração/admin foi enviada ao deploy. Valores privados permanecem somente em `.local/` ignorado; não foram exibidos.
 
-Dry-run de deploy identificou FastAPI e confirmou exclusão de `.env.local`, `.local`, `.tools`, `.venv`, `.vercel`, testes e documentos. Artefatos gerados `frontend/dist`/`public` são recriados pelo build remoto para evitar enviar versões antigas. O script local de login foi corrigido para reconhecer tanto `loggedIn:false` quanto o retorno autenticado com `username`/`team`.
+Dry-run de deploy identificou FastAPI e confirmou exclusão de `.env.local`, `.local`, `.tools`, `.venv`, `.vercel`, testes e documentos. O build recria `public` a partir do Vite; a publicação também inclui os três arquivos gerados locais, conferidos byte a byte com `frontend/dist`, para disponibilização no CDN. O script local de login foi corrigido para reconhecer tanto `loggedIn:false` quanto o retorno autenticado com `username`/`team`.
 
 ## Verificação e estado
 
 Fases anteriores: 148 testes Python, 3 componentes e 1 fluxo Chromium aprovados; backup/restore real local aprovado. Isso é histórico local, não teste do destino remoto. Secret scan e sintaxe PowerShell passaram após a preparação de staging.
 
-Deploy e verificações remotas serão registrados abaixo quando executados. Não há ativação de WhatsApp, IA nem produção clínica neste passo.
+O histórico abaixo registra a autorização, o primeiro problema de publicação e sua resolução. A seção final contém a verificação remota concluída. Não há ativação de WhatsApp, IA nem produção clínica neste passo.
 
-## Primeiro deploy — autorização específica pendente
+## Histórico do primeiro deploy — autorização específica posteriormente concedida
 
 O envio de Preview a partir do commit local `2f72fdb52658` foi recusado pela CLI com `first_deployment_production`: o primeiro deploy de um projeto Vercel deve usar o canal Production. Não ocorreu upload/deploy bem-sucedido.
 
@@ -33,6 +33,28 @@ O usuário aprovou especificamente o canal Production deste projeto isolado. As 
 A página inicial retornou 404. Os logs comprovaram Python 3.12, instalação de dependências e build Vite executados, mas `public` constava da exclusão de publicação. A exclusão foi removida para permitir o CDN da Vercel; o preparador passou a remover apenas assets gerados obsoletos, validando os caminhos antes da remoção. O build local e a presença/hashes dos arquivos estáticos foram verificados antes do novo envio. O estado READY sozinho não foi tratado como validação ponta a ponta.
 
 Foi criada uma clínica de demonstração claramente identificada como sintética, com administrador de MFA e parâmetros exclusivos de teste. Credenciais aleatórias permanecem em arquivo privado local, sem envio ao chat. Nenhuma configuração foi interpretada como política real de clínica.
+
+## Resultado remoto — 31/10/2026
+
+URL de demonstração: **https://projeto-extensao-staging.vercel.app**. Deploy `dpl_Gpsvo82nQwDS5rJSsQ74XXDZEFQY`, estado READY, fonte `e3c29f3b90cec2232a9026ff4467c986b973647b`. O canal Vercel é Production somente porque o serviço exige esse canal para iniciar o projeto; a aplicação e o banco continuam exclusivamente de staging (`APP_ENV=staging`).
+
+HTTP real confirmou página HTML, JavaScript e CSS com `200`, tipos de conteúdo corretos, nosniff e CSP com scripts da própria origem, sem unsafe-inline. Health/readiness retornaram `200`; sessão anônima, `401`. A URL imutável preservou redirecionamento à autenticação Vercel (`302`). A URL fixa apresenta o login da aplicação. Evidência: [staging-http-checks.json](staging-http-checks.json).
+
+Um fluxo Chromium isolado executou contra a aplicação publicada e o Neon real, sem mocks: senha → desafio obrigatório MFA → seleção de clínica → revisão e confirmação de agendamento → verificação manual de vínculo sintético → remarcação → cancelamento. Leituras autenticadas confirmaram no banco os estados `rescheduled` e `canceled`. Também passou registrar atendimento, assumir conversa, registrar resposta na outbox, devolver ao bot e consultar auditoria. Nenhuma mensagem foi enviada a um provedor.
+
+O primeiro ensaio encontrou um seletor de teste ambíguo entre feedback e carregamento; somente o teste foi ajustado. Outro ensaio foi corretamente bloqueado pela fila sintética sem expediente; o seed foi corrigido para horários de demonstração, sem alterar regras da aplicação. O fluxo final passou por completo, com zero respostas API de erro durante as operações. Registros sintéticos dos ensaios permanecem na clínica de demonstração.
+
+Logout invalidou a sessão (`401` posterior), com localStorage vazio. Axe WCAG 2 A/AA e 2.1 AA não encontrou violações nas telas verificadas: agenda desktop, revisão e agenda mobile (390 × 844). Isso não equivale a auditoria completa de acessibilidade. Evidência: [staging-smoke-evidence.json](staging-smoke-evidence.json); capturas [desktop](staging-agenda-desktop.png), [revisão](staging-review.png) e [mobile](staging-agenda-mobile.png).
+
+As instruções de acesso, senha aleatória e segredo para cadastrar o autenticador estão somente no arquivo privado local `.local/staging-access.md`, ignorado pelo Git e pelo deploy. Não copiar seu conteúdo para issues, documentação pública ou chat. Código e relatórios estão em commits locais da branch `codex/staging-delivery`; não houve push para GitHub nesta etapa.
+
+## Limitações e próximos passos de operação
+
+- O portal de demonstração foi verificado; o produto completo ainda não atende os critérios de produção clínica.
+- WhatsApp não tem canal/credenciais Meta nem entrega externa verificada. A resposta da inbox fica na fila. Worker durável e agendamento com latência medida continuam pendentes de implantação/configuração.
+- IA continua desligada; faltam provedor, modelo, contrato, orçamento e políticas aprovadas.
+- Permanecem revisão clínica/jurídica, retenção/direitos automatizados, backup/restauração no destino, carga/cold start remoto e confirmação dos limites operacionais do plano. O ensaio de restauração anterior foi local.
+- Os 11 achados moderados de ferramentas npm continuam registrados; a auditoria de dependências de produção retornou zero achados na consulta realizada. Nenhuma certificação de segurança ou conformidade é afirmada.
 
 ## Fontes
 
