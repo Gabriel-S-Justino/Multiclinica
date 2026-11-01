@@ -1,0 +1,84 @@
+The files belonging to this database system will be owned by user "Cleber".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory C:/Users/Cleber/Documents/projetoExtensao/.local/pg-test-z5n44txl/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... windows
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Sao_Paulo
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    ^"C^:^\Users^\Cleber^\Documents^\projetoExtensao^\^.tools^\pg^\node^_modules^\^@embedded^-postgres^\windows^-x64^\native^\bin^\pg^_ctl^" -D ^"C^:^\Users^\Cleber^\Documents^\projetoExtensao^\^.local^\pg^-test^-z5n44txl^\data^" -l logfile start
+
+waiting for server to start.... done
+server started
+PostgreSQL real: PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+
+> clinic-portal@0.1.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [24436]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] {"correlation_id": "fad114f3-ee55-4eaf-9a25-f9bb03217864", "method": "GET", "status": 200, "duration_ms": 2}
+[WebServer] (node:4768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:2108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"correlation_id": "a0fbec7b-536a-41c2-bb19-03143780136d", "method": "GET", "status": 401, "duration_ms": 2}
+[WebServer] {"correlation_id": "edbbcdc2-ef7d-483b-86ac-736636d45620", "method": "POST", "status": 200, "duration_ms": 364}
+[WebServer] {"correlation_id": "a80d55ce-7b5c-4369-bbe8-b595fa552649", "method": "GET", "status": 200, "duration_ms": 71}
+[WebServer] {"correlation_id": "c7dc3b96-f82d-41dd-9cc5-dd453ece4345", "method": "GET", "status": 200, "duration_ms": 51}
+[WebServer] {"correlation_id": "f635b523-b7fe-4c5c-ac3d-2753c4e2cbd1", "method": "POST", "status": 200, "duration_ms": 58}
+[WebServer] {"correlation_id": "da045523-5b72-4f70-9b83-2057b765b5e3", "method": "GET", "status": 200, "duration_ms": 47}
+[WebServer] {"correlation_id": "c53f3592-fe0d-47d6-a5e1-9fa7674d5f69", "method": "GET", "status": 200, "duration_ms": 66}
+[WebServer] {"correlation_id": "9090730d-26b0-4644-8e51-adb9542d97e2", "method": "GET", "status": 200, "duration_ms": 85}
+[WebServer] {"correlation_id": "45a406af-b02f-49d2-a129-b285eb8a8228", "method": "GET", "status": 200, "duration_ms": 89}
+[WebServer] {"correlation_id": "e1461f20-e2df-4c94-af78-ea53c2cb1939", "method": "GET", "status": 200, "duration_ms": 91}
+[WebServer] {"correlation_id": "87f8e416-7947-4bfe-b886-4ae05acfd940", "method": "GET", "status": 200, "duration_ms": 118}
+[WebServer] {"correlation_id": "ac367854-27ba-4da6-952b-022a6a016ca6", "method": "GET", "status": 200, "duration_ms": 141}
+[WebServer] {"correlation_id": "bfb69356-4a4b-456b-a95c-0b454d677c02", "method": "GET", "status": 200, "duration_ms": 169}
+[WebServer] {"correlation_id": "afafba35-ba37-467f-bf66-dfbb8b211ac6", "method": "GET", "status": 200, "duration_ms": 64}
+[WebServer] {"correlation_id": "41f86783-e530-426d-8225-372c3f4e2173", "method": "POST", "status": 200, "duration_ms": 64}
+[WebServer] {"correlation_id": "55f98cd4-9e73-45cb-8e71-0ff3bcca4f2c", "method": "GET", "status": 200, "duration_ms": 57}
+[WebServer] {"correlation_id": "053799fd-92df-430a-8638-92ff1d4dc86f", "method": "GET", "status": 200, "duration_ms": 64}
+[WebServer] {"correlation_id": "2da8eb22-6dbc-4756-a079-9381952583ce", "method": "GET", "status": 200, "duration_ms": 85}
+[WebServer] {"correlation_id": "c4cce4c2-dd73-4f63-9960-12de14e522a4", "method": "GET", "status": 200, "duration_ms": 113}
+[WebServer] {"correlation_id": "4190e805-0e4f-42a0-a936-5d71e98dfbee", "method": "GET", "status": 200, "duration_ms": 125}
+[WebServer] {"correlation_id": "1f0d0544-6d4f-46ed-8317-19ba267d90ae", "method": "GET", "status": 200, "duration_ms": 63}
+[WebServer] {"correlation_id": "803c14f3-ec04-4e42-89a2-03c1642601cd", "method": "GET", "status": 200, "duration_ms": 81}
+[WebServer] {"correlation_id": "de68365a-bafb-4ceb-b3e4-ce91a50e9ac9", "method": "GET", "status": 200, "duration_ms": 164}
+[WebServer] {"correlation_id": "75f55684-405b-44b8-bb4d-3b3bdb09f250", "method": "POST", "status": 200, "duration_ms": 129}
+[WebServer] {"correlation_id": "2684da62-97b0-4218-84b6-cfab4ef71ffe", "method": "GET", "status": 200, "duration_ms": 71}
+[WebServer] {"correlation_id": "7428d1e5-5714-43af-89a8-07ce2959e750", "method": "GET", "status": 200, "duration_ms": 63}
+[WebServer] {"correlation_id": "4a141e85-9ced-4102-90b9-b2e8a3ff7546", "method": "GET", "status": 200, "duration_ms": 102}
+[WebServer] {"correlation_id": "201f5ced-8236-4a73-821d-416b2d3baba6", "method": "GET", "status": 200, "duration_ms": 179}
+[WebServer] {"correlation_id": "2057bfae-19f7-42aa-8405-269eeea759da", "method": "POST", "status": 200, "duration_ms": 161}
+[WebServer] {"correlation_id": "9e41cb00-1200-44d6-87f6-e52c4d41ab7c", "method": "GET", "status": 200, "duration_ms": 67}
+[WebServer] {"correlation_id": "c4c245cb-7245-4a67-92c7-23640e8fe28c", "method": "GET", "status": 200, "duration_ms": 114}
+[WebServer] {"correlation_id": "945ed423-bdbb-4487-9532-e72cd89db3bf", "method": "GET", "status": 200, "duration_ms": 160}
+[WebServer] {"correlation_id": "a15540bf-79ed-442e-86c5-419eb3c63c76", "method": "GET", "status": 200, "duration_ms": 77}
+[WebServer] {"correlation_id": "79d7f75d-8d3c-4fca-ae53-1f07472c1553", "method": "GET", "status": 200, "duration_ms": 117}
+[WebServer] {"correlation_id": "87d80a40-8a66-4851-9b7a-92800c5e4a18", "method": "POST", "status": 204, "duration_ms": 150}
+[WebServer] {"correlation_id": "2df7c908-da21-4945-b75e-57ac2a51e79b", "method": "GET", "status": 401, "duration_ms": 1}
+  ok 1 e2e\foundation.spec.ts:4:1 › login, seleção de clínica, escopo profissional e logout com backend real (5.8s)
+
+  1 passed (10.8s)
+Migration upgrade / existing data / downgrade / upgrade: PASS
+waiting for server to shut down.... done
+server stopped

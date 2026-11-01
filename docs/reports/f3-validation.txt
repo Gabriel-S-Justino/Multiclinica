@@ -1,0 +1,69 @@
+F3 — verificação local — 31/10/2026
+
+Comando: ruff check backend tests scripts
+All checks passed!
+Resultado: PASS
+
+Comando: ruff format --check backend tests scripts
+37 files already formatted
+Resultado: PASS
+
+Comando: mypy backend
+Success: no issues found in 27 source files
+Resultado: PASS
+
+Comando: bandit -r backend -q
+Resultado: PASS
+
+Comando: python scripts/check_secrets.py
+Arquivos examinados: 95; poss�veis segredos: 0
+Resultado: PASS
+
+Comando: npm --prefix frontend run lint
+
+> clinic-portal@0.1.0 lint
+> eslint . --max-warnings=0
+
+Resultado: PASS
+
+Comando: npm --prefix frontend run build
+
+> clinic-portal@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 63 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.36 kB │ gzip:  0.27 kB
+dist/assets/index-Cug0AReA.css    1.20 kB │ gzip:  0.59 kB
+dist/assets/index-Dut9eFal.js   257.58 kB │ gzip: 79.94 kB
+
+✓ built in 336ms
+Resultado: PASS
+
+Comando: npm --prefix frontend test
+
+> clinic-portal@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.5 C:/Users/Cleber/Documents/projetoExtensao/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  21:16:32
+   Duration  2.69s (environment 69%, setup 10%, tests 10%, import 9%, transform 1%)
+
+Resultado: PASS
+
+Comando: git diff --check
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+Resultado: PASS
+Arquivos examinados: 99; poss�veis segredos: 0
+Links locais da documentação: PASS
+PostgreSQL 18.6: 76 testes Python aprovados (49 integração + 27 unitários); 3 cenários de 50 concorrentes com 1 vencedor; Chromium e2e: 1 aprovado. Migrações: 0001 com dados -> 0002, downgrade/upgrade: PASS. Auditoria Python: 72 dependências, 0 vulnerabilidades conhecidas.
+Rodada final após correção da data local: 77 testes Python aprovados (49 integração + 28 unitários), Chromium e2e 1 aprovado, migrations PASS; Ruff/formatação, mypy e Bandit PASS. Evidência final substitui a contagem anterior de 76.
+Arquivos examinados: 99; poss�veis segredos: 0
