@@ -18,6 +18,14 @@ Fases anteriores: 148 testes Python, 3 componentes e 1 fluxo Chromium aprovados;
 
 Deploy e verificações remotas serão registrados abaixo quando executados. Não há ativação de WhatsApp, IA nem produção clínica neste passo.
 
+## Primeiro deploy — autorização específica pendente
+
+O envio de Preview a partir do commit local `2f72fdb52658` foi recusado pela CLI com `first_deployment_production`: o primeiro deploy de um projeto Vercel deve usar o canal Production. Não ocorreu upload/deploy bem-sucedido.
+
+Foi preparada a configuração do mesmo projeto isolado para esse canal, mantendo `APP_ENV=staging`, MFA e o banco de testes. A revisão automática rejeitou a gravação das seis variáveis em Production porque o escopo anterior era Preview e exigiu autorização explícita do usuário para a mudança material de ambiente/exposição. A ação não foi executada; uma leitura posterior confirmou zero variáveis nesse canal. Nenhum contorno da rejeição foi aplicado.
+
+A aprovação necessária cobre gravar as seis variáveis da aplicação e fazer o primeiro deploy no canal Production **somente** de `clbrfrancaa/projeto-extensao-staging`, com a URL reservada deste staging. Isso não implica habilitar WhatsApp, IA, dados reais ou uma produção clínica. A continuidade de implementação permanece autorizada; esta aprovação específica é exigida pela revisão automática para o canal remoto diferente.
+
 ## Fontes
 
 Consultadas em 31/10/2026: [papéis Neon](https://github.com/neondatabase/website/blob/main/content/docs/manage/roles.md) — papéis criados por Console/API/CLI recebem `neon_superuser`; SQL permite papéis limitados; [acesso ao banco](https://github.com/neondatabase/website/blob/main/content/docs/manage/database-access.md); [regiões Vercel](https://vercel.com/docs/functions/configuring-functions/region); [referência de integração Vercel](https://vercel.com/docs/integrations/create-integration/vercel-api-integrations). Os limites do plano foram lidos da instalação real, sem upgrade ou contratação paga.
