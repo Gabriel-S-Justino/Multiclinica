@@ -2,6 +2,8 @@
 
 Em 08/11/2026, o usuário solicitou substituir a conta de demonstração por um acesso compartilhado apenas com senha. No staging isolado, `STAGING_DEMO_USER_ID` identifica a única conta que pode usar esse fluxo. Auditoria, credenciais de integração e operações administrativas protegidas exigem MFA verificado. As verificações de 31/10/2026 abaixo registram a configuração anterior.
 
+Em 11/11/2026, o deploy `dpl_GDefB8aC4cEdVnThkEnJUQ9vXhCH` publicou a alteração. O teste Chromium na URL pública confirmou entrada sem código, seleção da clínica sintética, abertura da agenda, rejeição do acesso à auditoria e logout. As sessões anteriores da conta de demonstração foram revogadas. Passaram 89 testes de integração e 64 testes unitários.
+
 Alvo confirmado: `clbrfrancaa/projeto-extensao-staging`, ID `prj_ncn1i5U1cQNjjLQxIeurJh54rtL1`, plano Hobby. Framework FastAPI, Node 24.x, Python 3.12 e região proposta de função `gru1`. Origem reservada verificada pela API: `https://projeto-extensao-staging.vercel.app`.
 
 ## Banco e configuração

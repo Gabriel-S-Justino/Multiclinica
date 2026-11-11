@@ -17,6 +17,7 @@ def settings(**overrides):
         "token_key": secrets.token_hex(32),
         "field_key": Fernet.generate_key().decode(),
         "app_env": "test",
+        "mfa_required": True,
     }
     return Settings(**(values | overrides))
 
