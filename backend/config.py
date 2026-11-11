@@ -1,5 +1,6 @@
 from typing import Literal, Self
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from cryptography.fernet import Fernet
 from pydantic import SecretStr, field_validator, model_validator
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
     token_key: SecretStr
     field_key: SecretStr
     mfa_required: bool = True
+    staging_demo_user_id: UUID | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -58,4 +60,10 @@ class Settings(BaseSettings):
     def require_mfa(self) -> Self:
         if self.app_env != "test" and not self.mfa_required:
             raise ValueError("MFA não pode ser desabilitado fora dos testes")
+        if self.staging_demo_user_id is not None and self.app_env != "staging":
+            raise ValueError("A conta de demonstração só pode ser configurada em staging")
         return self
+
+    def requires_mfa_for(self, user_id: UUID) -> bool:
+        demo_account = self.app_env == "staging" and self.staging_demo_user_id == user_id
+        return self.mfa_required and not demo_account

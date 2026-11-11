@@ -201,6 +201,36 @@ def test_rate_limit_is_atomic(foundation):
     assert sum(results) == 5
 
 
+def test_staging_password_only_access_is_limited_to_demo_account(foundation):
+    settings, admin, ids, password, client = foundation
+    settings.app_env = "staging"
+    with Session(admin) as db, db.begin():
+        db.get(User, ids["admin"]).login = "admin"
+    headers = {"Origin": settings.public_origin}
+
+    def log_in(login):
+        return client.post(
+            "/v1/auth/login", json={"login": login, "password": password}, headers=headers
+        )
+
+    settings.mfa_required = True
+    assert log_in("admin").status_code == 401
+    settings.staging_demo_user_id = ids["admin"]
+    assert log_in("reception@test.invalid").status_code == 401
+    demo = log_in("admin")
+    assert demo.status_code == 200
+    assert demo.json() == {"status": "authenticated"}
+    headers["X-CSRF-Token"] = client.cookies.get("__Host-clinic_csrf")
+    membership = client.post(
+        "/v1/auth/active-membership",
+        json={"membership_id": str(ids["admin_member"])},
+        headers=headers,
+    )
+    assert membership.status_code == 200
+    assert client.get("/v1/professionals").status_code == 200
+    assert client.get("/v1/audit").status_code == 403
+
+
 def test_mfa_cookie_flags_replay_and_audit_permission(foundation):
     settings, admin, ids, password, client = foundation
     secret = pyotp.random_base32()

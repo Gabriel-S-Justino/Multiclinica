@@ -93,7 +93,10 @@ class PortalContext:
             or not tenant
             or not tenant.active
             or (roles is not None and member.role not in roles)
-            or (self.settings.mfa_required and not self.identity.mfa_verified)
+            or (
+                self.settings.requires_mfa_for(self.identity.user_id)
+                and not self.identity.mfa_verified
+            )
         ):
             raise PortalError("permission_denied", 403)
         moment = now(self.db)

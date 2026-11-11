@@ -29,12 +29,22 @@ def settings(**overrides):
         {"public_origin": "https://example.com/path"},
         {"public_origin": "http://example.com"},
         {"field_key": "invalid"},
+        {"app_env": "local", "mfa_required": False},
+        {"app_env": "staging", "mfa_required": False},
         {"app_env": "production", "mfa_required": False},
+        {"app_env": "production", "staging_demo_user_id": uuid4()},
     ],
 )
 def test_configuration_fails_closed(overrides):
     with pytest.raises(ValidationError):
         settings(**overrides)
+
+
+def test_staging_accepts_explicit_demo_configuration():
+    demo = uuid4()
+    config = settings(app_env="staging", staging_demo_user_id=demo)
+    assert not config.requires_mfa_for(demo)
+    assert config.requires_mfa_for(uuid4())
 
 
 def test_password_and_token_storage():

@@ -41,9 +41,9 @@ def login(
         raise AuthError
     if PASSWORDS.check_needs_rehash(user.password_hash):
         user.password_hash = PASSWORDS.hash(password)
-    if settings.mfa_required or user.mfa_secret:
+    if settings.requires_mfa_for(user.id) or user.mfa_secret:
         if not user.mfa_secret:
-            # Enrollment is an operator-controlled command, never a password-only bypass.
+            # Enrollment is controlled by the operator.
             raise AuthError
         challenge = token()
         db.add(

@@ -143,7 +143,11 @@ class Scheduler:
             or (is_contact and not user.is_service)
             or not tenant
             or not tenant.active
-            or (not is_contact and self.settings.mfa_required and not self.identity.mfa_verified)
+            or (
+                not is_contact
+                and self.settings.requires_mfa_for(self.identity.user_id)
+                and not self.identity.mfa_verified
+            )
         ):
             raise SchedulingError("permission_denied")
         # clock_timestamp, not transaction-start now(): a waiter must not reuse stale time.
