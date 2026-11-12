@@ -1,21 +1,37 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "framework": "fastapi",
   "buildCommand": "npm --prefix frontend ci --ignore-scripts && npm --prefix frontend run build && python scripts/prepare_static.py",
   "functions": {
     "backend/asgi.py": {
-      "excludeFiles": "{.local/**,.tools/**,.venv/**,.git/**,.hypothesis/**,.mypy_cache/**,.pytest_cache/**,.ruff_cache/**,docs/**,tests/**,frontend/node_modules/**,frontend/test-results/**}"
+      "excludeFiles": "{.local/**,.tools/**,.venv/**,.git/**,.hypothesis/**,.mypy_cache/**,.pytest_cache/**,.ruff_cache/**,docs/**,tests/**,frontend/node_modules/**,frontend/test-results/**}",
+      "includeFiles": "{public/**,frontend/dist/**}"
     }
   },
-  "rewrites": [{"source": "/", "destination": "/index.html"}],
-  "headers": [{
-    "source": "/(.*)",
-    "headers": [
-      {"key": "X-Content-Type-Options", "value": "nosniff"},
-      {"key": "Referrer-Policy", "value": "no-referrer"},
-      {"key": "X-Frame-Options", "value": "DENY"},
-      {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"}
-    ]
-  }]
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        }
+      ]
+    }
+  ]
 }
