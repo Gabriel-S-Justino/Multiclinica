@@ -80,7 +80,7 @@ def test_changes_hash_and_revokes_active_sessions(account):
     engine, settings, uid, initial, replacement = account
     with Session(engine) as db, db.begin():
         session = db.get(PortalSession, "0" * 64)
-        auth.change_authenticated_password(db, settings, session, initial, replacement)
+        auth.change_authenticated_password(db, settings, session, replacement)
     with Session(engine) as db:
         user = db.get(User, uid)
         assert user is not None
@@ -90,7 +90,7 @@ def test_changes_hash_and_revokes_active_sessions(account):
         assert list(db.scalars(select(AuditLog.action))) == ["auth.password_changed"]
 
 
-@pytest.mark.parametrize("failure", ["bad_current", "same", "without_mfa", "stale_mfa"])
+@pytest.mark.parametrize("failure", ["same", "without_mfa", "stale_mfa"])
 def test_rejects_invalid_changes_without_mutation(account, failure):
     engine, settings, uid, initial, replacement = account
     with pytest.raises(auth.AuthError), Session(engine) as db, db.begin():
@@ -100,9 +100,8 @@ def test_rejects_invalid_changes_without_mutation(account, failure):
             session.mfa_verified = False
         if failure == "stale_mfa":
             session.authenticated_at = datetime.now(UTC) - timedelta(minutes=16)
-        provided = secrets.token_urlsafe(20) if failure == "bad_current" else initial
         new_value = initial if failure == "same" else replacement
-        auth.change_authenticated_password(db, settings, session, provided, new_value)
+        auth.change_authenticated_password(db, settings, session, new_value)
     with Session(engine) as db:
         user = db.get(User, uid)
         assert user is not None and verify_password(user.password_hash, initial)
@@ -130,7 +129,7 @@ def test_authenticated_endpoint_requires_csrf_and_changes_password(account, monk
     monkeypatch.setattr("backend.main.consume", lambda *_: True)
     app = create_app(settings, engine)
     client = TestClient(app)
-    payload = {"current_password": initial, "new_password": replacement}
+    payload = {"new_password": replacement}
     invalid = client.post(
         "/v1/auth/password/change-authenticated",
         json=payload,
@@ -147,3 +146,33 @@ def test_authenticated_endpoint_requires_csrf_and_changes_password(account, monk
         user = db.get(User, uid)
         assert user is not None and verify_password(user.password_hash, replacement)
         assert db.get(PortalSession, "0" * 64) is None
+
+
+def test_stale_mfa_session_has_actionable_error(account, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from backend.infrastructure.security import digest
+    from backend.main import create_app
+
+    engine, settings, uid, initial, replacement = account
+    csrf_value = secrets.token_urlsafe(18)
+    with Session(engine) as db, db.begin():
+        session = db.get(PortalSession, "0" * 64)
+        assert session is not None
+        session.authenticated_at = datetime.now(UTC) - timedelta(minutes=6)
+        session.csrf_hash = digest(settings, "csrf", csrf_value)
+
+    monkeypatch.setattr(auth, "get_session", lambda db, *_: db.get(PortalSession, "0" * 64))
+    monkeypatch.setattr("backend.main.consume", lambda *_: True)
+    client = TestClient(create_app(settings, engine))
+    response = client.post(
+        "/v1/auth/password/change-authenticated",
+        json={"new_password": replacement},
+        headers={"Origin": settings.public_origin, "X-CSRF-Token": csrf_value},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "reauthentication_required"
+    with Session(engine) as db:
+        user = db.get(User, uid)
+        assert user is not None and verify_password(user.password_hash, initial)
+        assert db.get(PortalSession, "0" * 64) is not None

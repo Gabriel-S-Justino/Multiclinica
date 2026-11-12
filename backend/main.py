@@ -207,6 +207,12 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             status_code=status,
         )
 
+    @app.exception_handler(auth.ReauthenticationRequired)
+    async def reauthentication_required(
+        request: Request, exc: auth.ReauthenticationRequired
+    ) -> JSONResponse:
+        return error_response(request, 403, "reauthentication_required")
+
     @app.exception_handler(auth.AuthError)
     async def auth_error(request: Request, exc: auth.AuthError) -> JSONResponse:
         return error_response(request, 401, "authentication_failed")
@@ -373,7 +379,6 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             db,
             settings,
             session,
-            command.current_password.get_secret_value(),
             command.new_password.get_secret_value(),
         )
         response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="lax")

@@ -33,6 +33,10 @@ class AuthError(Exception):
     pass
 
 
+class ReauthenticationRequired(AuthError):
+    """A recent second-factor verification is required for sensitive operations."""
+
+
 def login(
     db: Session, settings: Settings, login_name: str, password: str
 ) -> tuple[str, str | None]:
@@ -219,10 +223,9 @@ def change_authenticated_password(
     db: Session,
     settings: Settings,
     session: PortalSession,
-    current_password: str,
     new_password: str,
 ) -> None:
-    """Self-service password change requires a recently MFA-verified session."""
+    """Allow a password change only during a freshly MFA-verified session."""
     moment = datetime.now(UTC)
     authenticated_at = session.authenticated_at
     if authenticated_at.tzinfo is None:
@@ -230,17 +233,16 @@ def change_authenticated_password(
     if (
         not session.mfa_verified
         or authenticated_at > moment
-        or moment - authenticated_at > timedelta(minutes=15)
+        or moment - authenticated_at > timedelta(minutes=5)
     ):
-        raise AuthError
+        raise ReauthenticationRequired
     user = db.scalar(select(User).where(User.id == session.user_id).with_for_update())
-    valid = verify_password(user.password_hash if user else DUMMY_HASH, current_password)
     if (
         not user
-        or not valid
         or not user.active
         or user.is_service
-        or current_password == new_password
+        or not user.mfa_secret
+        or verify_password(user.password_hash, new_password)
     ):
         raise AuthError
     member = (

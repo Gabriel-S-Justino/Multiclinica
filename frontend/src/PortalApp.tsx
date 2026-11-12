@@ -78,20 +78,18 @@ function Roster({member}: {member:Membership}) {
 function Allowed({member,capability,children}:{member:Membership;capability:string;children:ReactNode}) {return member.capabilities?.includes(capability)?children:<><PageHeader title={pt.denied}/><Empty>{pt.denied}</Empty></>;}
 
 function AccountPassword({onClose,onChanged}: {onClose:()=>void;onChanged:()=>Promise<unknown>}) {
-  const [currentPassword,setCurrentPassword]=useState('');
   const [newPassword,setNewPassword]=useState('');
   const [confirmation,setConfirmation]=useState('');
   const action=useAction();
   const mismatch=confirmation.length>0&&confirmation!==newPassword;
   return <Modal title={pt.changeOwnPassword} onClose={onClose}>
     <Feedback action={action}/>
-    <p className="note">A troca exige a senha atual e uma sessão com MFA validado nos últimos 15 minutos. Se necessário, saia e entre novamente.</p>
+    <p className="note">Entre com sua senha e o Microsoft Authenticator. Por 5 minutos após o login, você poderá definir uma nova senha sem repetir a senha atual. Se o prazo vencer, saia e entre novamente.</p>
     <form className="form-grid" onSubmit={event=>{event.preventDefault();if(mismatch)return;void action.run(async()=>{
-      await api('/auth/password/change-authenticated',{current_password:currentPassword,new_password:newPassword});
-      setCurrentPassword('');setNewPassword('');setConfirmation('');
+      await api('/auth/password/change-authenticated',{new_password:newPassword});
+      setNewPassword('');setConfirmation('');
       await onChanged();
     });}}>
-      <Label text={pt.currentPassword}><input type="password" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={event=>setCurrentPassword(event.target.value)}/></Label>
       <Label text={pt.newPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={event=>setNewPassword(event.target.value)}/></Label>
       <Label text={pt.confirmNewPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={confirmation} onChange={event=>setConfirmation(event.target.value)}/></Label>
       {mismatch&&<p role="alert" className="feedback error">{pt.passwordMismatch}</p>}
