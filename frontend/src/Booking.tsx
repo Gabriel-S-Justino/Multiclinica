@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from './api';
 import { pt } from './locales';
-import { Empty, Failure, Feedback, Label, Loading, Modal, Status, formatDay, localDay, useAction, useRemote } from './ui';
+import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, Status, formatDay, formatLongDay, localDay, useAction, useRemote } from './ui';
 import type { Appointment, AppointmentReceipt, Catalog, Hold, Membership, Page, PatientOption, Slot, Summary } from './types';
 
 export function Booking({member, original, onClose, onDone}: {member: Membership; original?: Appointment; onClose: () => void; onDone: (id:string) => void}) {
@@ -65,21 +65,35 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
   }
   function close() { if (action.busy) return; if (hold) void action.send(`/holds/${hold.hold_id}/release`, {hold_id:hold.hold_id,contact_id:contactId}).catch(() => undefined); onClose(); }
 
-  return <Modal title={original ? pt.reschedule : pt.newAppointment} onClose={close}>
-    <p className="muted">{pt.newBookingDescription}</p><Feedback action={action}/>
+  const patientReady = !!original || (!!contactId && (!!patientId || (!!patientName.trim() && purpose && (!service?.requires_birth_date || !!birthDate))));
+  const searchHint = !contactId ? pt.searchHintContact : !patientReady ? pt.searchHintPatient : !serviceId || !unitId ? pt.searchHintService : '';
+  const step = summary ? 3 : patientReady ? 2 : 1;
+  const professionalName = (id: string) => catalog.data?.professionals.find(item=>item.id===id)?.display_name;
+  function resetContact() { setContact(''); setPatients([]); setPatient(''); setPatientName(''); setPurpose(false); setSlots([]); setSearched(false); }
+
+  return <Modal title={original ? pt.reschedule : pt.newAppointment} onClose={close} size="wide">
+    <ol className="steps" aria-label={pt.steps}>{(original ? [pt.stepSlot, pt.stepReview] : [pt.stepPatient, pt.stepSlot, pt.stepReview]).map((label, index) => {
+      const number = original ? index + 2 : index + 1;
+      return <li key={label} className={number < step ? 'done' : number === step ? 'current' : ''} aria-current={number === step ? 'step' : undefined}><span className="step-index" aria-hidden="true">{number < step ? <Icon name="check" size={14}/> : index + 1}</span>{label}</li>;
+    })}</ol>
+    {!summary && <p className="muted">{pt.newBookingDescription}</p>}<Feedback action={action}/>
     {catalog.isPending ? <Loading/> : catalog.isError ? <Failure error={catalog.error}/> : summary ? <>
-      <h3>{pt.review}</h3><p>{pt.reviewHint}</p><dl className="review-grid">
+      <h3>{pt.review}</h3><p className="muted">{pt.reviewHint}</p><dl className="review-grid">
+        <dt>{pt.patient}</dt><dd>{patientId ? patients.find(item => item.id===patientId)?.display_name ?? patientName : patientName}</dd>
         <dt>{pt.service}</dt><dd>{summary.service_name}</dd><dt>{pt.professional}</dt><dd>{summary.professional_name}</dd>
-        <dt>{pt.date}</dt><dd>{formatDay(summary.local_date)} · {summary.local_start}</dd><dt>{pt.unit}</dt><dd>{summary.unit_name}</dd>
-        <dt>{pt.duration}</dt><dd>{summary.duration_minutes}</dd><dt>{pt.patient}</dt><dd>{patientId ? patients.find(item => item.id===patientId)?.display_name ?? patientName : patientName}</dd>
-        <dt>{pt.timezone}</dt><dd>{summary.timezone}</dd><dt>{pt.reservedUntil}</dt><dd>{new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:summary.timezone}).format(new Date(summary.expires_at))}</dd>
-      </dl><div className="form-actions"><button className="secondary" disabled={action.busy} onClick={() => void release()}>{pt.back}</button>
+        <dt>{pt.date}</dt><dd>{formatLongDay(summary.local_date)} · {summary.local_start}</dd><dt>{pt.unit}</dt><dd>{summary.unit_name}</dd>
+        <dt>{pt.durationShort}</dt><dd>{summary.duration_minutes} {pt.minutesShort}</dd>
+        <dt>{pt.timezone}</dt><dd>{summary.timezone}</dd>
+      </dl><p className="note compact"><Icon name="clock" size={16}/>{pt.reservedUntil} {new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:summary.timezone}).format(new Date(summary.expires_at))}</p>
+      <div className="form-actions"><button className="secondary" disabled={action.busy} onClick={() => void release()}>{pt.back}</button>
         <button disabled={action.busy} onClick={() => void confirm()}>{action.busy ? pt.loading : original ? pt.confirmReschedule : pt.confirmBooking}</button></div>
     </> : <>
-      {!original && <section className="form-section"><h3>{pt.patient}</h3><p className="muted">{pt.contactDifferent}</p>
+      {original ? <div className="context-card"><Icon name="user"/><div><strong>{original.patient_name}</strong><p className="muted">{original.service_name} · {formatDay(original.local_date)} {original.local_start}</p></div></div>
+      : <section className="form-section"><h3>{pt.patient}</h3><p className="muted">{pt.contactDifferent}</p>
         {!contactId ? <form onSubmit={(event) => {event.preventDefault(); void lookup();}} className="inline-form">
           <Label text={pt.contactPhone}><input type="tel" autoComplete="off" placeholder="+5511999999999" pattern="\+[1-9][0-9]{7,14}" maxLength={16} required value={phone} onChange={event => setPhone(event.target.value)}/></Label>
           <button disabled={action.busy}>{pt.lookupContact}</button></form> : <>
+            <div className="context-card"><Icon name="phone"/><div><span className="muted">{pt.contact}</span><strong>{phone}</strong></div><button type="button" className="text-button" disabled={action.busy} onClick={resetContact}>{pt.changeContact}</button></div>
             <Label text={pt.patient}><select value={patientId} onChange={event => {setPatient(event.target.value); setPatientName(patients.find(item=>item.id===event.target.value)?.display_name ?? '');}}>
               <option value="">{pt.newPatient}</option>{patients.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></Label>
             {!patientId && <div className="form-grid"><Label text={pt.patientName}><input autoComplete="off" maxLength={120} required value={patientName} onChange={event=>setPatientName(event.target.value)}/></Label>
@@ -92,12 +106,12 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
           {catalog.data.services.filter(item=>item.bookable || item.id===original?.service_id).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Label>
         <Label text={pt.unit}><select required value={unitId} onChange={event=>{setUnit(event.target.value);setSearched(false);setSlots([]);}}><option value="">{pt.select}</option>{catalog.data.units.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Label>
         <Label text={pt.professional}><select value={professionalId} onChange={event=>{setProfessional(event.target.value);setSlots([]);setSearched(false);}}><option value="">{pt.noPreference}</option>{catalog.data.professionals.filter(item=>item.active).map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></Label>
-        <Label text={pt.date}><input type="date" required value={date} onChange={event=>{setDate(event.target.value);setSlots([]);setSearched(false);}}/></Label>
-        <div className="wide"><button disabled={action.busy || !contactId || (!original && !patientId && (!patientName.trim() || !purpose || (!!service?.requires_birth_date && !birthDate)))}>{pt.chooseSlot}</button></div>
+        <Label text={pt.date}><input type="date" required min={localDay(member.timezone)} value={date} onChange={event=>{setDate(event.target.value);setSlots([]);setSearched(false);}}/></Label>
+        <div className="wide search-row"><button disabled={action.busy || !contactId || !patientReady}>{pt.chooseSlot}</button>{searchHint && <small className="field-hint">{searchHint}</small>}</div>
       </form>
-      {searched && <section className="form-section"><h3>{pt.availableSlots}</h3>{!slots.length ? <Empty>{pt.noSlots}</Empty> : <div className="slot-list">{slots.map(slot=><button className="slot secondary" key={`${slot.professional_id}:${slot.starts_at}`} disabled={action.busy} onClick={()=>void reserve(slot)}>
-        <strong>{slot.local_start}</strong><span>{catalog.data.professionals.find(item=>item.id===slot.professional_id)?.display_name}</span></button>)}</div>}
-        {slotCursor && <button className="secondary" disabled={action.busy} onClick={()=>void search(slotCursor)}>{pt.more}</button>}</section>}
+      {searched && <section className="form-section slots-section"><h3>{pt.availableSlots}</h3>{!slots.length ? <Empty icon="calendar">{pt.noSlots}</Empty> : <><p className="muted">{pt.slotHint}</p><div className="slot-list">{slots.map(slot=><button type="button" className="slot secondary" key={`${slot.professional_id}:${slot.starts_at}`} disabled={action.busy} onClick={()=>void reserve(slot)}>
+        <strong>{slot.local_start}</strong><span>{professionalName(slot.professional_id)}</span></button>)}</div></>}
+        {slotCursor && <button type="button" className="secondary" disabled={action.busy} onClick={()=>void search(slotCursor)}>{pt.more}</button>}</section>}
     </>}
   </Modal>;
 }
@@ -118,20 +132,20 @@ export function AppointmentDetails({member, appointmentId, onClose, onReschedule
   return <Modal title={mode==='verify'?pt.verifyIdentity:mode==='cancel'?pt.cancelAppointment:pt.appointmentDetails} onClose={onClose}>
     <Feedback action={action}/>{result.isPending ? <Loading/> : result.isError ? <Failure error={result.error}/> : row && <>
       <div className="appointment-title"><div><h3>{row.patient_name}</h3><p>{row.service_name}</p></div><Status value={row.status}/></div>
-      <dl className="review-grid"><dt>{pt.professional}</dt><dd>{row.professional_name}</dd><dt>{pt.date}</dt><dd>{formatDay(row.local_date)} · {row.local_start}–{row.local_end}</dd><dt>{pt.unit}</dt><dd>{row.unit_name}</dd></dl>
-      {mode==='cancel' ? <><p>{pt.cancellationHint}</p><button className="danger" disabled={action.busy} onClick={()=>void action.run(async()=>{await action.send(`/appointments/${row.id}/cancel`,{appointment_id:row.id,contact_id:row.contact_id,version:row.version});setMode('details');},pt.canceled)}>{pt.cancelConfirm}</button></> : mode==='verify' ? <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
+      <dl className="review-grid"><dt>{pt.professional}</dt><dd>{row.professional_name}</dd><dt>{pt.date}</dt><dd>{formatLongDay(row.local_date)}</dd><dt>{pt.time}</dt><dd>{row.local_start}–{row.local_end}</dd><dt>{pt.unit}</dt><dd>{row.unit_name}</dd></dl>
+      {mode==='cancel' ? <div className="confirm-box"><h3>{pt.confirmCancelTitle}</h3><p>{pt.cancellationHint}</p><div className="form-actions"><button type="button" className="secondary" disabled={action.busy} onClick={()=>setMode('details')}>{pt.keepAppointment}</button><button className="danger" disabled={action.busy} onClick={()=>void action.run(async()=>{await action.send(`/appointments/${row.id}/cancel`,{appointment_id:row.id,contact_id:row.contact_id,version:row.version});setMode('details');},pt.canceled)}>{pt.cancelConfirm}</button></div></div> : mode==='verify' ? <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
         await action.send('/patient-verifications',{patient_id:row.patient_id,contact_id:row.contact_id,relationship,identity_checked:identity,authority_checked:authority,evidence_reference:evidence});setMode('details');
       },pt.verified);}}><p className="wide muted">{pt.identityHint}</p><Label text={pt.relationship}><select value={relationship} onChange={event=>setRelationship(event.target.value)}><option value="self">{pt.self}</option><option value="dependent">{pt.dependent}</option><option value="authorized_other">{pt.authorizedOther}</option></select></Label>
         <Label text={pt.evidence}><input pattern="[A-Za-z0-9._:-]{1,80}" required value={evidence} onChange={event=>setEvidence(event.target.value)} maxLength={80}/></Label>
         <label className="check wide"><input type="checkbox" required checked={identity} onChange={event=>setIdentity(event.target.checked)}/>{pt.identityChecked}</label>
-        <label className="check wide"><input type="checkbox" required checked={authority} onChange={event=>setAuthority(event.target.checked)}/>{pt.authorityChecked}</label><button disabled={action.busy}>{pt.verifyIdentity}</button>
-      </form> : <div className="form-actions wrap">
-        {row.actions.includes('verify_identity') && <button onClick={()=>setMode('verify')}>{pt.verifyIdentity}</button>}
-        {row.actions.includes('reschedule') && <button className="secondary" onClick={()=>onReschedule(row)}>{pt.reschedule}</button>}
-        {row.actions.includes('cancel') && <button className="danger secondary" onClick={()=>setMode('cancel')}>{pt.cancelAppointment}</button>}
-        {row.actions.includes('confirm') && <button disabled={action.busy} className="secondary" onClick={()=>void change('confirmed')}>{pt.confirmAttendance}</button>}
-        {row.actions.includes('complete') && <button disabled={action.busy} className="secondary" onClick={()=>void change('completed')}>{pt.complete}</button>}
+        <label className="check wide"><input type="checkbox" required checked={authority} onChange={event=>setAuthority(event.target.checked)}/>{pt.authorityChecked}</label><div className="form-actions wide"><button type="button" className="secondary" disabled={action.busy} onClick={()=>setMode('details')}>{pt.back}</button><button disabled={action.busy}>{pt.verifyIdentity}</button></div>
+      </form> : <div className="form-actions wrap details-actions">
+        {row.actions.includes('cancel') && <button className="danger secondary push-left" onClick={()=>setMode('cancel')}>{pt.cancelAppointment}</button>}
         {row.actions.includes('no_show') && <button disabled={action.busy} className="secondary" onClick={()=>void change('no_show')}>{pt.noShow}</button>}
+        {row.actions.includes('reschedule') && <button className="secondary" onClick={()=>onReschedule(row)}>{pt.reschedule}</button>}
+        {row.actions.includes('verify_identity') && <button className="secondary" onClick={()=>setMode('verify')}>{pt.verifyIdentity}</button>}
+        {row.actions.includes('complete') && <button disabled={action.busy} onClick={()=>void change('completed')}>{pt.complete}</button>}
+        {row.actions.includes('confirm') && <button disabled={action.busy} onClick={()=>void change('confirmed')}>{pt.confirmAttendance}</button>}
       </div>}
     </>}
   </Modal>;

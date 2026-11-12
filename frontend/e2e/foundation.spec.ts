@@ -13,7 +13,7 @@ test('login, seleção de clínica, escopo profissional e logout com backend rea
   await expect(page.getByRole('combobox',{name:'Profissional',exact:true}).getByRole('option',{name:'Profissional de teste E2E',exact:true})).toBeAttached();
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(accessibility.violations).toEqual([]);
-  await page.getByRole('button', { name: '+ Novo agendamento', exact: true }).click();
+  await page.getByRole('button', { name: 'Novo agendamento', exact: true }).click();
   const dialog=page.getByRole('dialog');
   await dialog.getByLabel('Telefone do contato (com código do país)').fill('+15550001234');
   await dialog.getByRole('button',{name:'Continuar com o contato'}).click();
@@ -29,7 +29,7 @@ test('login, seleção de clínica, escopo profissional e logout com backend rea
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'../.local/f4-review.png',fullPage:true});
   await dialog.getByRole('button',{name:'Confirmar agendamento',exact:true}).click();
-  await expect(page.getByRole('status')).toContainText('Agendamento confirmado.');
+  await expect(page.getByRole('status').filter({hasText:'Agendamento confirmado.'})).toBeVisible();
   await expect(dialog.getByRole('heading',{name:'Paciente sintético E2E'})).toBeVisible();
   await dialog.getByRole('button',{name:'Fechar',exact:true}).click();
   await page.setViewportSize({width:390,height:844});
