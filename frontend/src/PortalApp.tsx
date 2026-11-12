@@ -7,10 +7,10 @@ import { Audit, IntegrationPage, Schedules, Services, Settings, SupportReviews, 
 import { InboxPage } from './InboxPage';
 import { Platform } from './Platform';
 import { pt } from './locales';
-import { Empty, Failure, Feedback, Label, Loading, PageHeader, useAction, useRemote } from './ui';
+import { Empty, Failure, Feedback, Label, Loading, Modal, PageHeader, useAction, useRemote } from './ui';
 import type { Membership, Page, Professional, Session } from './types';
 
-function Login({onAuthenticated}: {onAuthenticated:()=>Promise<unknown>}) {
+function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;info?:string}) {
   const [challenge,setChallenge]=useState<string>();
   const [login,setLogin]=useState('');const [password,setPassword]=useState('');const [code,setCode]=useState('');
   const [mode,setMode]=useState<'login'|'recover'|'change'>('login');
@@ -23,7 +23,7 @@ function Login({onAuthenticated}: {onAuthenticated:()=>Promise<unknown>}) {
     setToken('');setReplacement('');setConfirmation('');
   }
   return <div className="auth-layout"><section className="auth-story" aria-label={pt.title}><div className="brand-lockup"><span className="brand" aria-hidden="true">+</span><strong>{pt.title}</strong></div><div><p className="eyebrow">{pt.workspace}</p><h1>{pt.foundation}</h1><div className="story-lines" aria-hidden="true"><i/><i/><i/></div></div><p>{pt.agenda} · {pt.inbox}</p></section>
-    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2>{mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>
+    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2>{mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>{info&&<p role="status" className="feedback success">{info}</p>}
       <form onSubmit={event=>{event.preventDefault();void action.run(async()=>{
         if(mode==='recover'){
           await api('/auth/recovery/confirm',{token,password:replacement});backToLogin();return;
@@ -77,8 +77,32 @@ function Roster({member}: {member:Membership}) {
 
 function Allowed({member,capability,children}:{member:Membership;capability:string;children:ReactNode}) {return member.capabilities?.includes(capability)?children:<><PageHeader title={pt.denied}/><Empty>{pt.denied}</Empty></>;}
 
-function Workspace({session,member,onSwitch,onLogout,switching,onAccepted}: {session:Session;member?:Membership;onSwitch:(id:string)=>Promise<void>;onLogout:()=>Promise<void>;switching:boolean;onAccepted:()=>Promise<unknown>}) {
+function AccountPassword({onClose,onChanged}: {onClose:()=>void;onChanged:()=>Promise<unknown>}) {
+  const [currentPassword,setCurrentPassword]=useState('');
+  const [newPassword,setNewPassword]=useState('');
+  const [confirmation,setConfirmation]=useState('');
+  const action=useAction();
+  const mismatch=confirmation.length>0&&confirmation!==newPassword;
+  return <Modal title={pt.changeOwnPassword} onClose={onClose}>
+    <Feedback action={action}/>
+    <p className="note">A troca exige a senha atual e uma sessão com MFA validado nos últimos 15 minutos. Se necessário, saia e entre novamente.</p>
+    <form className="form-grid" onSubmit={event=>{event.preventDefault();if(mismatch)return;void action.run(async()=>{
+      await api('/auth/password/change-authenticated',{current_password:currentPassword,new_password:newPassword});
+      setCurrentPassword('');setNewPassword('');setConfirmation('');
+      await onChanged();
+    });}}>
+      <Label text={pt.currentPassword}><input type="password" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={event=>setCurrentPassword(event.target.value)}/></Label>
+      <Label text={pt.newPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={event=>setNewPassword(event.target.value)}/></Label>
+      <Label text={pt.confirmNewPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={confirmation} onChange={event=>setConfirmation(event.target.value)}/></Label>
+      {mismatch&&<p role="alert" className="feedback error">{pt.passwordMismatch}</p>}
+      <div className="form-actions wide"><button type="button" className="secondary" onClick={onClose}>{pt.cancel}</button><button disabled={action.busy||mismatch}>{action.busy?pt.loading:pt.changeOwnPassword}</button></div>
+    </form>
+  </Modal>;
+}
+
+function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching,onAccepted}: {session:Session;member?:Membership;onSwitch:(id:string)=>Promise<void>;onLogout:()=>Promise<void>;onPasswordChanged:()=>Promise<unknown>;switching:boolean;onAccepted:()=>Promise<unknown>}) {
   const location=useLocation();
+  const [accountOpen,setAccountOpen]=useState(false);
   useEffect(()=>{document.getElementById('page-title')?.focus();},[location.pathname]);
   const nav=[{path:'/agenda',title:pt.agenda,icon:'▦',cap:'agenda.read'},{path:'/inbox',title:pt.inbox,icon:'◷',cap:'inbox.read'},
     {path:'/schedules',title:pt.schedules,icon:'▤',cap:'agenda.read'},{path:'/services',title:pt.services,icon:'◇',cap:'services.manage'},
@@ -86,10 +110,10 @@ function Workspace({session,member,onSwitch,onLogout,switching,onAccepted}: {ses
     {path:'/integrations',title:pt.integrations,icon:'↔',cap:'integrations.manage'},{path:'/audit',title:pt.audit,icon:'≡',cap:'audit.read'},
     {path:'/support',title:pt.supportRequests,icon:'◎',cap:'support.review'},{path:'/clinics',title:pt.platform,icon:'▥',cap:'platform.manage'}];
   const home=member?.capabilities?.includes('platform.manage')?'/clinics':'/agenda';
-  return <div className="workspace"><a className="skip-link" href="#workspace-content" onClick={event=>{event.preventDefault();document.getElementById('workspace-content')?.focus();}}>{pt.skip}</a><aside className="sidebar"><div className="brand-lockup"><span className="brand" aria-hidden="true">+</span><strong>{pt.title}</strong></div>
+  return <><div className="workspace"><a className="skip-link" href="#workspace-content" onClick={event=>{event.preventDefault();document.getElementById('workspace-content')?.focus();}}>{pt.skip}</a><aside className="sidebar"><div className="brand-lockup"><span className="brand" aria-hidden="true">+</span><strong>{pt.title}</strong></div>
     <div className="clinic-select"><Label text={pt.choose}><select aria-label={pt.choose} value={session.active_membership_id??''} disabled={switching} onChange={event=>{if(event.target.value)void onSwitch(event.target.value);}}><option value="">{pt.choose}</option>{session.memberships.map((item,index)=><option key={item.id} value={item.id}>{item.clinic_name??`${pt.clinic} ${index+1}`}</option>)}</select></Label></div>
     <nav aria-label={pt.workspace}>{nav.filter(item=>member?.capabilities?.includes(item.cap)).map(item=><NavLink to={item.path} key={item.path}><span aria-hidden="true">{item.icon}</span>{item.title}</NavLink>)}</nav>
-    {member?.capabilities?.includes('agenda.read')&&<Roster member={member}/>}<div className="sidebar-footer"><span className="avatar" aria-hidden="true">{(pt.roles[member?.role??'']??pt.subtitle).slice(0,2).toUpperCase()}</span><div><strong>{pt.roles[member?.role??'']??pt.subtitle}</strong><button className="text-button" onClick={()=>void onLogout()}>{pt.logout}</button></div></div>
+    {member?.capabilities?.includes('agenda.read')&&<Roster member={member}/>}<div className="sidebar-footer"><span className="avatar" aria-hidden="true">{(pt.roles[member?.role??'']??pt.subtitle).slice(0,2).toUpperCase()}</span><div><strong>{pt.roles[member?.role??'']??pt.subtitle}</strong><button className="text-button" onClick={()=>setAccountOpen(true)}>{pt.myAccount}</button><button className="text-button" onClick={()=>void onLogout()}>{pt.logout}</button></div></div>
   </aside><div className="workspace-main"><header className="topbar"><span>{member?.clinic_name??pt.title}</span><span className="timezone">{member?.timezone}</span></header>
     <main id="workspace-content" tabIndex={-1}><Invitations onAccepted={onAccepted}/>{switching?<Loading/>:!member?<><PageHeader title={pt.choose}/><Empty>{pt.selectClinic}</Empty></>:<Routes>
       <Route path="/agenda" element={<Allowed member={member} capability="agenda.read"><Agenda member={member}/></Allowed>}/>
@@ -103,18 +127,19 @@ function Workspace({session,member,onSwitch,onLogout,switching,onAccepted}: {ses
       <Route path="/support" element={<Allowed member={member} capability="support.review"><SupportReviews member={member}/></Allowed>}/>
       <Route path="/clinics" element={<Allowed member={member} capability="platform.manage"><Platform member={member}/></Allowed>}/>
       <Route path="*" element={<Navigate to={home} replace/>}/>
-    </Routes>}</main></div></div>;
+    </Routes>}</main></div></div>{accountOpen&&<AccountPassword onClose={()=>setAccountOpen(false)} onChanged={onPasswordChanged}/>}</>;
 }
 
 export function App() {
   const client=useQueryClient();const session=useQuery({queryKey:['session'],queryFn:()=>api<Session>('/auth/session'),retry:false});
-  const [switching,setSwitching]=useState(false);const action=useAction();
+  const [switching,setSwitching]=useState(false);const [passwordChanged,setPasswordChanged]=useState(false);const action=useAction();
   const refetch=session.refetch;
   useEffect(()=>{function expire(){client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});void refetch();}window.addEventListener('clinic:session-expired',expire);return()=>window.removeEventListener('clinic:session-expired',expire);},[client,refetch]);
-  async function authenticated(){client.clear();return refetch();}
+  async function authenticated(){setPasswordChanged(false);client.clear();return refetch();}
+  async function passwordChangedSuccessfully(){setPasswordChanged(true);client.clear();return refetch();}
   async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});await refetch();});setSwitching(false);}
   async function logout(){await action.run(async()=>{await api('/auth/logout',{});client.clear();await refetch();});}
   if(session.isPending)return <main className="startup"><Loading/></main>;
-  if(session.isError){if(session.error instanceof ApiError&&session.error.status===401)return <Login onAuthenticated={authenticated}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}>{pt.refresh}</button></main>;}
-  return <><Feedback action={action}/><Workspace session={session.data} member={session.data.memberships.find(item=>item.id===session.data.active_membership_id)} switching={switching} onSwitch={switchClinic} onLogout={logout} onAccepted={refetch}/></>;
+  if(session.isError){if(session.error instanceof ApiError&&session.error.status===401)return <Login onAuthenticated={authenticated} info={passwordChanged?pt.passwordChanged:undefined}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}>{pt.refresh}</button></main>;}
+  return <><Feedback action={action}/><Workspace onPasswordChanged={passwordChangedSuccessfully} session={session.data} member={session.data.memberships.find(item=>item.id===session.data.active_membership_id)} switching={switching} onSwitch={switchClinic} onLogout={logout} onAccepted={refetch}/></>;
 }

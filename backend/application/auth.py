@@ -215,6 +215,61 @@ def change_password(
     )
 
 
+def change_authenticated_password(
+    db: Session,
+    settings: Settings,
+    session: PortalSession,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """Self-service password change requires a recently MFA-verified session."""
+    moment = datetime.now(UTC)
+    authenticated_at = session.authenticated_at
+    if authenticated_at.tzinfo is None:
+        authenticated_at = authenticated_at.replace(tzinfo=UTC)
+    if (
+        not session.mfa_verified
+        or authenticated_at > moment
+        or moment - authenticated_at > timedelta(minutes=15)
+    ):
+        raise AuthError
+    user = db.scalar(select(User).where(User.id == session.user_id).with_for_update())
+    valid = verify_password(user.password_hash if user else DUMMY_HASH, current_password)
+    if (
+        not user
+        or not valid
+        or not user.active
+        or user.is_service
+        or current_password == new_password
+    ):
+        raise AuthError
+    member = (
+        db.get(Membership, session.membership_id)
+        if session.membership_id
+        else db.scalar(
+            select(Membership)
+            .where(Membership.user_id == user.id, Membership.active.is_(True))
+            .order_by(Membership.id)
+            .limit(1)
+        )
+    )
+    if not member or not member.active or member.user_id != user.id:
+        raise AuthError
+    set_tenant(db, member.tenant_id)
+    user.password_hash = PASSWORDS.hash(new_password)
+    revoke_user_sessions(db, user.id)
+    db.execute(delete(RecoveryToken).where(RecoveryToken.user_id == user.id))
+    db.add(
+        AuditLog(
+            id=uuid4(),
+            tenant_id=member.tenant_id,
+            actor_id=user.id,
+            action="auth.password_changed",
+            resource_id=user.id,
+        )
+    )
+
+
 def revoke_user_sessions(db: Session, user_id: UUID) -> None:
     db.execute(delete(PortalSession).where(PortalSession.user_id == user_id))
     db.execute(delete(MFAChallenge).where(MFAChallenge.user_id == user_id))

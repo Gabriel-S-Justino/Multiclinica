@@ -29,6 +29,11 @@ class SelectMembership(Command):
     membership_id: UUID
 
 
+class AuthenticatedPasswordChange(Command):
+    current_password: SecretStr = Field(min_length=1, max_length=128)
+    new_password: SecretStr = Field(min_length=12, max_length=128)
+
+
 class RecoveryRequest(Command):
     login: str = Field(min_length=3, max_length=254)
 

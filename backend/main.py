@@ -27,6 +27,7 @@ from backend.infrastructure.rate_limit import consume
 from backend.infrastructure.security import digest
 from backend.presentation.portal_routes import register_portal_routes
 from backend.presentation.schemas import (
+    AuthenticatedPasswordChange,
     Login,
     PasswordChange,
     RecoveryConfirm,
@@ -358,6 +359,25 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             command.new_password.get_secret_value(),
             command.code,
         )
+
+    @app.post("/v1/auth/password/change-authenticated", status_code=204)
+    def change_own_authenticated_password(
+        command: AuthenticatedPasswordChange,
+        request: Request,
+        response: Response,
+        session: PortalSession = Depends(current),
+        db: Session = Depends(db_session, scope="function"),
+    ) -> None:
+        throttle(request, "password-change-authenticated", str(session.user_id))
+        auth.change_authenticated_password(
+            db,
+            settings,
+            session,
+            command.current_password.get_secret_value(),
+            command.new_password.get_secret_value(),
+        )
+        response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="lax")
+        response.delete_cookie(CSRF_COOKIE, secure=True, samesite="lax")
 
     @app.post("/v1/auth/recovery/request", status_code=202)
     def recovery_request(command: RecoveryRequest, request: Request) -> dict[str, str]:
