@@ -16,6 +16,7 @@ from backend.application.portal_commands import (
     BlockDraft,
     BreakGlassDecision,
     BreakGlassDraft,
+    ChannelProvisionDraft,
     ClinicPolicyDraft,
     ExceptionDraft,
     HandoffDraft,
@@ -506,6 +507,22 @@ def register_portal_routes(
     ) -> dict[str, Any]:
         keyed(request, command)
         return Integrations(ctx).save(provider, command)
+
+    @app.post("/v1/integrations/whatsapp/channel")
+    def provision_whatsapp_channel(
+        command: ChannelProvisionDraft,
+        request: Request,
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return Integrations(ctx).provision_channel(command)
+
+    @app.post("/v1/integrations/{provider}/verify")
+    def verify_integration(
+        provider: Literal["whatsapp", "ai"],
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, str]:
+        return Integrations(ctx).verify(provider)
 
     @app.get("/v1/audit", response_model=Page[AuditView])
     def audit(

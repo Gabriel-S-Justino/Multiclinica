@@ -226,8 +226,12 @@ class ReplyDraft(Versioned):
 
 class IntegrationDraft(Versioned):
     credentials: dict[str, SecretStr] = Field(
-        min_length=1, max_length=3, json_schema_extra={"writeOnly": True}
+        min_length=1, max_length=7, json_schema_extra={"writeOnly": True}
     )
+
+
+class ChannelProvisionDraft(Versioned):
+    """No secrets or caller-supplied tenant IDs are accepted."""
 
 
 class TenantDraft(Versioned):

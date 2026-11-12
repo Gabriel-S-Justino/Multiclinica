@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { api } from './api';
 import { pt } from './locales';
 import { Empty, Failure, Feedback, Label, Loading, Modal, PageHeader, Status, minutes, useAction, useRemote } from './ui';
 import type { Catalog, EntityReceipt, IntegrationState, Membership, Page, Queue, RecordData, SupportRequest } from './types';
@@ -147,17 +148,52 @@ export function Settings({member}: {member:Membership}) {
   </>;
 }
 
-function CredentialForm({member,row}: {member:Membership;row:IntegrationState}) {
-  const action=useAction(member);const [values,setValues]=useState<Record<string,string>>({});
-  const fields=row.provider==='ai'?[['api_key',pt.apiKey]]:[['access_token',pt.accessToken],['app_secret',pt.appSecret],['verify_token',pt.verifyToken]];
-  return <section className="panel"><h2>{row.provider==='ai'?pt.ai:pt.whatsapp}</h2><p><span className="badge">{row.configured?pt.configured:pt.notConfigured}</span> · {pt.notVerified}</p><Feedback action={action}/>
-    <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{await action.send(`/integrations/${row.provider}`,{version:row.version,credentials:values},'PUT');setValues({});},pt.saved);}}>
-      {fields.map(([name,label])=><Label key={name} text={label}><input type="password" autoComplete="new-password" maxLength={4096} required value={values[name]??''} onChange={event=>setValues({...values,[name]:event.target.value})}/></Label>)}<div className="wide"><button disabled={action.busy}>{pt.saveCredentials}</button></div>
-    </form></section>;
+function CredentialForm({member,row,queues}: {member:Membership;row:IntegrationState;queues:Queue[]}) {
+  const action=useAction(member);
+  const [values,setValues]=useState<Record<string,string>>({...(row.provider==='ai'?{provider:'openai'}:{}),...row.metadata});
+  const [verification,setVerification]=useState('');
+  const whatsapp=row.provider==='whatsapp';
+  const secrets=whatsapp
+    ? [['access_token',pt.accessToken],['app_secret',pt.appSecret],['verify_token',pt.verifyToken]]
+    : [['api_key',pt.apiKey]];
+  const set=(name:string,value:string)=>setValues(old=>({...old,[name]:value}));
+  const activeQueues=queues.filter(item=>item.active);
+  const readyForVerify=row.setup_complete;
+  return <section className="panel" aria-labelledby={`integration-${row.provider}`}>
+    <div className="section-heading"><h2 id={`integration-${row.provider}`}>{whatsapp?pt.whatsapp:pt.ai}</h2><span className="badge">{row.configured?pt.configured:pt.notConfigured}</span></div>
+    <p className="muted">{readyForVerify?'Informações obrigatórias preenchidas. Valide a conexão antes de solicitar a ativação.':pt.setupIncomplete}</p>
+    <Feedback action={action}/>{verification&&<p className="feedback success" role="status">{verification}</p>}
+    <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
+      const credentials=Object.fromEntries(Object.entries(values).filter(([,v])=>v.trim().length>0));
+      await action.send(`/integrations/${row.provider}`,{version:row.version,credentials},'PUT');
+      setValues(Object.fromEntries(Object.entries(values).filter(([key])=>!['access_token','app_secret','verify_token','api_key'].includes(key))));
+      setVerification('');
+    },pt.saved);}}>
+      {whatsapp?<><Label text={pt.phoneNumberId}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.phone_number_id??''} onChange={event=>set('phone_number_id',event.target.value)}/></Label>
+        <Label text={pt.accountId}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.account_id??''} onChange={event=>set('account_id',event.target.value)}/></Label>
+        <Label text={pt.graphVersion}><input pattern="v[0-9]{1,3}\.0" placeholder="v25.0" required maxLength={12} value={values.graph_version??''} onChange={event=>set('graph_version',event.target.value)}/></Label>
+        <Label text={pt.defaultQueue}><select required value={values.queue_id??''} onChange={event=>set('queue_id',event.target.value)}><option value="">Selecione uma fila ativa</option>{activeQueues.map(queue=><option key={queue.id} value={queue.id}>{queue.name}</option>)}</select></Label>
+        {activeQueues.length===0&&<p className="note wide">{pt.requireQueue}</p>}
+      </>:<><Label text={pt.aiProvider}><select required value={values.provider??'openai'} onChange={event=>set('provider',event.target.value)}><option value="openai">OpenAI API</option></select></Label>
+        <Label text={pt.aiModel}><input required minLength={1} maxLength={120} pattern="[A-Za-z0-9._-]{1,120}" placeholder="Identificador do modelo habilitado em sua conta" value={values.model??''} onChange={event=>set('model',event.target.value)}/></Label></>}
+      {secrets.map(([name,label])=><Label key={name} text={label}><input type="password" autoComplete="new-password" minLength={12} maxLength={4096} required={!row.configured} placeholder={row.configured?'Em branco para manter a credencial salva':''} value={values[name]??''} onChange={event=>set(name,event.target.value)}/></Label>)}
+      <div className="form-actions wide"><button type="submit" disabled={action.busy||whatsapp&&activeQueues.length===0}>{pt.saveCredentials}</button><button type="button" className="secondary" disabled={action.busy||!readyForVerify} onClick={()=>void action.run(async()=>{await api(`/integrations/${row.provider}/verify`,{});setVerification(pt.verifiedCredentials);})}>{pt.verifyConnection}</button>
+        {whatsapp&&readyForVerify&&!row.channel_id&&<button type="button" disabled={action.busy||!verification} onClick={()=>void action.run(async()=>{await action.send('/integrations/whatsapp/channel',{version:row.version});setVerification('');},pt.provisionedChannel)}>{pt.provisionChannel}</button>}
+      </div>
+    </form>
+    {whatsapp&&row.channel_id&&<p className="note">Canal: <code>{row.channel_id}</code> · Envio: {row.send_enabled?'Habilitado':'Desativado'}</p>}
+    {whatsapp&&row.webhook_url&&<p><strong>Webhook da Meta:</strong> <code>{row.webhook_url}</code></p>}
+    <div className="integration-checklist"><h3>Etapas pendentes para ativação</h3>
+      <ul>{row.pending_steps.map(step=><li key={step}>{pt.integrationSteps[step as keyof typeof pt.integrationSteps]??step}</li>)}</ul>
+    </div>
+  </section>;
 }
 export function IntegrationPage({member}:{member:Membership}) {
   const result=useRemote<Page<IntegrationState>>(member,'/integrations');
-  return <><PageHeader title={pt.integrations} description={pt.integrationsDescription}/><p className="note">{pt.integrationHint}</p>{result.isPending?<Loading/>:result.isError?<Failure error={result.error}/>:result.data.items.map(row=><CredentialForm key={row.provider} member={member} row={row}/>)}</>;
+  const queues=useRemote<Page<Queue>>(member,'/admin/queues');
+  return <><PageHeader title={pt.integrations} description={pt.integrationsDescription}/><p className="note">{pt.integrationHint}</p>
+    {result.isPending?<Loading/>:result.isError?<Failure error={result.error}/>:result.data.items.map(row=><CredentialForm key={`${row.provider}:${row.version}`} member={member} row={row} queues={queues.data?.items??[]}/>)}
+  </>;
 }
 
 export function Audit({member}:{member:Membership}) {

@@ -94,6 +94,12 @@ class IntegrationView(View):
     version: int
     updated_at: str | None
     verification_status: str
+    setup_complete: bool
+    metadata: dict[str, str]
+    channel_id: str | None
+    webhook_url: str | None
+    send_enabled: bool
+    pending_steps: list[str]
 
 
 class IntegrationsView(View):
