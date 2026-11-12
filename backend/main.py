@@ -28,6 +28,7 @@ from backend.infrastructure.security import digest
 from backend.presentation.portal_routes import register_portal_routes
 from backend.presentation.schemas import (
     Login,
+    PasswordChange,
     RecoveryConfirm,
     RecoveryRequest,
     SelectMembership,
@@ -340,6 +341,23 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         db.delete(session)
         response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="lax")
         response.delete_cookie(CSRF_COOKIE, secure=True, samesite="lax")
+
+    @app.post("/v1/auth/password/change", status_code=204)
+    def change_own_password(
+        command: PasswordChange,
+        request: Request,
+        db: Session = Depends(db_session, scope="function"),
+    ) -> None:
+        login_origin(request)
+        throttle(request, "password-change", command.login)
+        auth.change_password(
+            db,
+            settings,
+            command.login,
+            command.current_password.get_secret_value(),
+            command.new_password.get_secret_value(),
+            command.code,
+        )
 
     @app.post("/v1/auth/recovery/request", status_code=202)
     def recovery_request(command: RecoveryRequest, request: Request) -> dict[str, str]:

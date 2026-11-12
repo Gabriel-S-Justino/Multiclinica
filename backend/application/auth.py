@@ -1,8 +1,9 @@
 import hmac
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pyotp
+from cryptography.fernet import InvalidToken
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
@@ -161,6 +162,57 @@ def rotate_membership(
     )
     db.delete(session)
     return new_token, csrf
+
+
+def change_password(
+    db: Session,
+    settings: Settings,
+    login_name: str,
+    current_password: str,
+    new_password: str,
+    code: str,
+) -> None:
+    """Change only the authenticating user's password; require both factors."""
+    user = db.scalar(select(User).where(User.login == login_name.strip().lower()).with_for_update())
+    valid = verify_password(user.password_hash if user else DUMMY_HASH, current_password)
+    if (
+        not user
+        or not valid
+        or not user.active
+        or user.is_service
+        or not user.mfa_secret
+        or current_password == new_password
+    ):
+        raise AuthError
+    try:
+        secret = cipher(settings).decrypt(user.mfa_secret.encode()).decode()
+    except (InvalidToken, ValueError, TypeError):
+        raise AuthError from None
+    moment = datetime.now(UTC)
+    step = int(moment.timestamp()) // 30
+    if step <= user.last_totp_step or not hmac.compare_digest(pyotp.TOTP(secret).at(moment), code):
+        raise AuthError
+    member = db.scalar(
+        select(Membership)
+        .where(Membership.user_id == user.id, Membership.active.is_(True))
+        .order_by(Membership.id)
+        .limit(1)
+    )
+    if member is None:
+        raise AuthError
+    set_tenant(db, member.tenant_id)
+    user.password_hash = PASSWORDS.hash(new_password)
+    user.last_totp_step = step
+    revoke_user_sessions(db, user.id)
+    db.add(
+        AuditLog(
+            id=uuid4(),
+            tenant_id=member.tenant_id,
+            actor_id=user.id,
+            action="auth.password_changed",
+            resource_id=user.id,
+        )
+    )
 
 
 def revoke_user_sessions(db: Session, user_id: UUID) -> None:

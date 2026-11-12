@@ -11,22 +11,55 @@ import { Empty, Failure, Feedback, Label, Loading, PageHeader, useAction, useRem
 import type { Membership, Page, Professional, Session } from './types';
 
 function Login({onAuthenticated}: {onAuthenticated:()=>Promise<unknown>}) {
-  const [challenge,setChallenge]=useState<string>();const [login,setLogin]=useState('');const [password,setPassword]=useState('');const [code,setCode]=useState('');
-  const [recovery,setRecovery]=useState(false);const [token,setToken]=useState('');const [replacement,setReplacement]=useState('');
+  const [challenge,setChallenge]=useState<string>();
+  const [login,setLogin]=useState('');const [password,setPassword]=useState('');const [code,setCode]=useState('');
+  const [mode,setMode]=useState<'login'|'recover'|'change'>('login');
+  const [token,setToken]=useState('');const [replacement,setReplacement]=useState('');
+  const [confirmation,setConfirmation]=useState('');
   const action=useAction();
+  const mismatch=mode==='change' && confirmation.length>0 && replacement!==confirmation;
+  function backToLogin() {
+    setMode('login');setChallenge(undefined);setPassword('');setCode('');
+    setToken('');setReplacement('');setConfirmation('');
+  }
   return <div className="auth-layout"><section className="auth-story" aria-label={pt.title}><div className="brand-lockup"><span className="brand" aria-hidden="true">+</span><strong>{pt.title}</strong></div><div><p className="eyebrow">{pt.workspace}</p><h1>{pt.foundation}</h1><div className="story-lines" aria-hidden="true"><i/><i/><i/></div></div><p>{pt.agenda} · {pt.inbox}</p></section>
-    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2>{recovery?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>
+    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2>{mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>
       <form onSubmit={event=>{event.preventDefault();void action.run(async()=>{
-        if(recovery){await api('/auth/recovery/confirm',{token,password:replacement});setRecovery(false);setToken('');setReplacement('');action.setNotice(pt.passwordReset);return;}
+        if(mode==='recover'){
+          await api('/auth/recovery/confirm',{token,password:replacement});backToLogin();return;
+        }
+        if(mode==='change'){
+          if(replacement!==confirmation)throw new Error('password_mismatch');
+          await api('/auth/password/change',{login,current_password:password,new_password:replacement,code});
+          backToLogin();return;
+        }
         const result=challenge?await api<{status:string;challenge?:string}>('/auth/mfa/verify',{challenge,code}):await api<{status:string;challenge?:string}>('/auth/login',{login,password});
         setPassword('');setCode('');if(result.challenge)setChallenge(result.challenge);else{setChallenge(undefined);await onAuthenticated();}
-      });}}>
-        {recovery?<><Label text={pt.recoveryToken}><input type="password" autoComplete="off" required maxLength={128} value={token} onChange={event=>setToken(event.target.value)}/></Label><Label text={pt.newPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={replacement} onChange={event=>setReplacement(event.target.value)}/></Label></>:challenge?<Label text={pt.code}><input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={code} onChange={event=>setCode(event.target.value)}/></Label>:<>
+      },mode==='change'?pt.passwordChanged:mode==='recover'?pt.passwordReset:'');}}>
+        {mode==='change'?<>
           <Label text={pt.login}><input autoComplete="username" required maxLength={254} value={login} onChange={event=>setLogin(event.target.value)}/></Label>
-          <Label text={pt.password}><input type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={event=>setPassword(event.target.value)}/></Label></>}
-        <button className="full" disabled={action.busy}>{action.busy?pt.loading:recovery?pt.resetPassword:challenge?pt.verify:pt.signIn}</button>
+          <Label text={pt.currentPassword}><input type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={event=>setPassword(event.target.value)}/></Label>
+          <Label text={pt.code}><input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event=>setCode(event.target.value)}/></Label>
+          <Label text={pt.newPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={replacement} onChange={event=>setReplacement(event.target.value)}/></Label>
+          <Label text={pt.confirmNewPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={confirmation} onChange={event=>setConfirmation(event.target.value)}/></Label>
+          {mismatch&&<p role="alert" className="feedback error">{pt.passwordMismatch}</p>}
+        </>:mode==='recover'?<>
+          <Label text={pt.recoveryToken}><input type="password" autoComplete="off" required maxLength={128} value={token} onChange={event=>setToken(event.target.value)}/></Label>
+          <Label text={pt.newPassword}><input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={replacement} onChange={event=>setReplacement(event.target.value)}/></Label>
+        </>:challenge?
+          <Label text={pt.code}><input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={code} onChange={event=>setCode(event.target.value)}/></Label>
+        :<>
+          <Label text={pt.login}><input autoComplete="username" required maxLength={254} value={login} onChange={event=>setLogin(event.target.value)}/></Label>
+          <Label text={pt.password}><input type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={event=>setPassword(event.target.value)}/></Label>
+        </>}
+        <button className="full" disabled={action.busy||mismatch}>{action.busy?pt.loading:mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</button>
       </form>
-      {challenge||recovery?<button className="text-button" onClick={()=>{setChallenge(undefined);setRecovery(false);setPassword('');setCode('');setToken('');setReplacement('');}}>{pt.backLogin}</button>:<div className="auth-help"><button className="text-button" disabled={action.busy||!login} onClick={()=>void action.run(()=>api('/auth/recovery/request',{login}),pt.recoveryInfo)}>{pt.recovery}</button><button className="text-button" onClick={()=>setRecovery(true)}>{pt.haveRecovery}</button></div>}
+      {challenge||mode!=='login'?<button className="text-button" type="button" onClick={backToLogin}>{pt.backLogin}</button>
+        :<div className="auth-help">
+          <button className="text-button" disabled={action.busy||!login} onClick={()=>void action.run(()=>api('/auth/recovery/request',{login}),pt.recoveryInfo)}>{pt.recovery}</button>
+          <button className="text-button" onClick={()=>setMode('recover')}>{pt.haveRecovery}</button>
+          <button className="text-button" onClick={()=>{setPassword('');setCode('');setMode('change');}}>{pt.changeOwnPassword}</button>
+        </div>}
     </div></main></div>;
 }
 

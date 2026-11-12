@@ -6,7 +6,9 @@ export const pt = {
   empty:'Nenhum profissional disponível para este acesso.', professionals:'Profissionais autorizados', choose:'Selecionar clínica',
   recovery:'Recuperar acesso', recoveryInfo:'Solicitação registrada. Procure o administrador para recuperar o acesso.',
   recoveryToken:'Código de recuperação', newPassword:'Nova senha', resetPassword:'Redefinir senha', haveRecovery:'Já tenho um código', // pragma: allowlist secret (rótulos da interface)
-  passwordReset:'Senha redefinida. Entre novamente.', backLogin:'Voltar ao login', // pragma: allowlist secret (rótulos da interface)
+  passwordReset:'Senha redefinida. Entre novamente.', backLogin:'Voltar ao login',
+  changeOwnPassword:'Alterar minha senha', currentPassword:'Senha atual', confirmNewPassword:'Confirmar nova senha',
+  passwordMismatch:'As novas senhas não coincidem.', passwordChanged:'Senha alterada. Entre com a nova senha e aguarde o próximo código do Authenticator.', // pragma: allowlist secret (rótulos da interface)
   foundation:'Sua equipe, seus horários e cada atendimento em um só lugar.',
   noRecords:'Nenhum registro para exibir.', save:'Salvar alterações', saved:'Alterações salvas.', create:'Cadastrar', edit:'Editar',
   cancel:'Cancelar', close:'Fechar', refresh:'Atualizar', next:'Continuar', back:'Voltar', more:'Carregar mais', remove:'Excluir',
