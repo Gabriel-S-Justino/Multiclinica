@@ -395,4 +395,6 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
 
     register_portal_routes(app, settings, db_session, current)
     register_webhooks(app, settings, db_session)
+    # Publish the built Vite frontend without changing the existing API routes.
+    app.frontend("/", directory="public", fallback="index.html", check_dir=False)
     return app
