@@ -58,7 +58,7 @@ function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;inf
         :<div className="auth-help">
           <button className="text-button" disabled={action.busy||!login} onClick={()=>void action.run(()=>api('/auth/recovery/request',{login}),pt.recoveryInfo)}>{pt.recovery}</button>
           <button className="text-button" onClick={()=>setMode('recover')}>{pt.haveRecovery}</button>
-          <button className="text-button" onClick={()=>{setPassword('');setCode('');setMode('change');}}>{pt.changeOwnPassword}</button>
+          
         </div>}
     </div></main></div>;
 }
