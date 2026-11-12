@@ -167,7 +167,16 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
                 "X-Correlation-ID": request.state.correlation_id,
                 "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer",
-                "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+                "Content-Security-Policy": (
+                    "default-src 'none'; frame-ancestors 'none'"
+                    if request.url.path == "/v1" or request.url.path.startswith("/v1/")
+                    else (
+                        "default-src 'self'; script-src 'self'; style-src 'self'; "
+                        "connect-src 'self'; img-src 'self'; font-src 'self'; "
+                        "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; "
+                        "form-action 'self'"
+                    )
+                ),
                 "Cache-Control": "no-store",
                 "X-Frame-Options": "DENY",
             }
