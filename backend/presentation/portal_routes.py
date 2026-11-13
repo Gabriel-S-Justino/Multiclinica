@@ -132,8 +132,12 @@ def register_portal_routes(
         return ClinicAdmin(ctx).save_professional(command, entity_id)
 
     @app.get("/v1/team/memberships")
-    def memberships(ctx: PortalContext = Depends(context)) -> dict[str, Any]:
-        return ClinicAdmin(ctx).team()
+    def memberships(
+        limit: int = Query(100, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=2048),
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        return ClinicAdmin(ctx).team(limit, cursor)
 
     @app.patch("/v1/team/memberships/{entity_id}")
     def update_membership(
@@ -607,6 +611,26 @@ def register_portal_routes(
         ctx: PortalContext = Depends(context),
     ) -> dict[str, Any]:
         return PlatformAdmin(ctx).users(limit, cursor, search.strip())
+
+    @app.get("/v1/platform/tenants/{tenant_id}/permissions")
+    def platform_clinic_permissions(
+        tenant_id: UUID,
+        limit: int = Query(50, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=2048),
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        return PlatformAdmin(ctx).clinic_permissions(tenant_id, limit, cursor)
+
+    @app.patch("/v1/platform/tenants/{tenant_id}/permissions/{membership_id}")
+    def platform_save_clinic_permissions(
+        tenant_id: UUID,
+        membership_id: UUID,
+        command: MembershipDraft,
+        request: Request,
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).save_clinic_permissions(tenant_id, membership_id, command)
 
     @app.patch("/v1/platform/users/{user_id}")
     def platform_user_status(

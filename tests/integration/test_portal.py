@@ -635,6 +635,56 @@ def test_platform_management_is_separate_from_clinic_data(portal):
     p.call("GET", "/v1/platform/users", expected=403)
 
 
+def test_platform_and_clinic_admin_manage_permissions_with_tenant_scope(portal):
+    p = portal
+    tenant = p.h.ids["tenant"]
+    member = p.h.ids["reception_member"]
+    path = f"/v1/platform/tenants/{tenant}/permissions"
+    values = {
+        "version": 0,
+        "role": "reception",
+        "active": True,
+        "can_manage_schedule": True,
+        "professional_ids": [str(p.h.ids["professional"])],
+        "queue_ids": [str(p.h.ids["queue"])],
+    }
+    p.login()
+    p.call("GET", path, expected=403)
+    p.call("PATCH", f"{path}/{member}", p.command(**values), expected=403)
+    p.call(
+        "PATCH",
+        f"/v1/team/memberships/{p.h.ids['other_member']}",
+        p.command(**values),
+        expected=404,
+    )
+    p.login("superadmin")
+    page = p.call("GET", path, expected=200).json()
+    assert str(member) in {row["id"] for row in page["items"]}
+    assert str(p.h.ids["other_member"]) not in {row["id"] for row in page["items"]}
+    assert {item["id"] for item in page["queues"]} == {str(p.h.ids["queue"])}
+    p.call(
+        "PATCH",
+        f"{path}/{member}",
+        p.command(**(values | {"queue_ids": [str(p.h.ids["foreign_queue"])]})),
+        expected=404,
+    )
+    p.call("PATCH", f"{path}/{p.h.ids['other_member']}", p.command(**values), expected=404)
+    command = p.command(**values)
+    receipt = p.call("PATCH", f"{path}/{member}", command, expected=200).json()
+    assert p.call("PATCH", f"{path}/{member}", command, expected=200).json() == receipt
+    p.call("GET", "/v1/inbox", expected=403)
+    p.login()
+    members = p.call("GET", "/v1/team/memberships", expected=200).json()["items"]
+    edited = next(item for item in members if item["id"] == str(member))
+    assert edited["can_manage_schedule"] and edited["queue_ids"] == values["queue_ids"]
+    p.call(
+        "PATCH",
+        f"/v1/team/memberships/{member}",
+        p.command(**(values | {"version": receipt["version"], "role": "collaborator"})),
+        expected=200,
+    )
+
+
 def test_platform_clinic_registration(portal):
     p = portal
     p.login("superadmin")

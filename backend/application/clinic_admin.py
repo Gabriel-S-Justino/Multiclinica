@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import delete, func, select
 
+from backend.application.pagination import cursor_for, offset_for
 from backend.application.portal import read_professional, visible_professionals
 from backend.application.portal_access import PortalContext, PortalError, command_values
 from backend.application.portal_commands import (
@@ -297,65 +298,89 @@ class ClinicAdmin:
             "professional.save", command, {"id": str(row.id), "version": version}, entity_id
         )
 
-    def team(self) -> dict[str, Any]:
+    def team(self, limit: int, cursor: str | None) -> dict[str, Any]:
         self.ctx.admin()
+        filters = {"limit": limit}
+        offset = offset_for(self.ctx, cursor, "clinic-memberships", filters)
+        items = self.memberships(limit=limit + 1, offset=offset)
+        return {
+            "items": items[:limit],
+            "next_cursor": cursor_for(
+                self.ctx,
+                offset + limit if len(items) > limit else None,
+                "clinic-memberships",
+                filters,
+            ),
+        }
+
+    def memberships(self, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         members = self.db.execute(
             select(Membership, User)
             .join(User, User.id == Membership.user_id)
-            .where(Membership.tenant_id == self.ctx.tenant_id)
+            .where(
+                Membership.tenant_id == self.ctx.tenant_id,
+                Membership.role.in_(("admin", "reception", "collaborator")),
+                User.is_service.is_(False),
+            )
             .order_by(User.login)
-            .limit(100)
+            .offset(offset)
+            .limit(limit)
         )
-        return {
-            "items": [
-                {
-                    "id": str(member.id),
-                    "user_id": str(user.id),
-                    "login": user.login,
-                    "role": member.role,
-                    "active": member.active,
-                    "can_manage_schedule": member.can_manage_schedule,
-                    "version": self.ctx.version("membership", member.id),
-                    "professional_ids": [
-                        str(value)
-                        for value in self.db.scalars(
-                            select(ProfessionalAssignment.professional_id).where(
-                                ProfessionalAssignment.tenant_id == self.ctx.tenant_id,
-                                ProfessionalAssignment.membership_id == member.id,
-                            )
+        return [
+            {
+                "id": str(member.id),
+                "user_id": str(user.id),
+                "login": user.login,
+                "role": member.role,
+                "active": member.active,
+                "can_manage_schedule": member.can_manage_schedule,
+                "version": self.ctx.version("membership", member.id),
+                "professional_ids": [
+                    str(value)
+                    for value in self.db.scalars(
+                        select(ProfessionalAssignment.professional_id).where(
+                            ProfessionalAssignment.tenant_id == self.ctx.tenant_id,
+                            ProfessionalAssignment.membership_id == member.id,
                         )
-                    ],
-                    "queue_ids": [
-                        str(value)
-                        for value in self.db.scalars(
-                            select(QueueMembership.queue_id).where(
-                                QueueMembership.tenant_id == self.ctx.tenant_id,
-                                QueueMembership.membership_id == member.id,
-                            )
+                    )
+                ],
+                "queue_ids": [
+                    str(value)
+                    for value in self.db.scalars(
+                        select(QueueMembership.queue_id).where(
+                            QueueMembership.tenant_id == self.ctx.tenant_id,
+                            QueueMembership.membership_id == member.id,
                         )
-                    ],
-                }
-                for member, user in members
-            ]
-        }
+                    )
+                ],
+            }
+            for member, user in members
+        ]
 
     def save_membership(self, command: MembershipDraft, entity_id: UUID) -> dict[str, Any]:
         self.ctx.admin(write=True)
+        return self.update_permissions(command, entity_id)
+
+    def update_permissions(self, command: MembershipDraft, entity_id: UUID) -> dict[str, Any]:
         replay = self.ctx.replay("membership.save", command, entity_id)
         if replay is not None:
             return replay
         row: Membership = self.ctx.entity(Membership, entity_id)
-        if row.role == "superadmin":
+        user = self.db.get(User, row.user_id)
+        if row.role not in {"admin", "reception", "collaborator"} or not user or user.is_service:
             raise PortalError("permission_denied", 403)
         if row.active and row.role == "admin" and (not command.active or command.role != "admin"):
             others = self.db.scalar(
                 select(func.count())
                 .select_from(Membership)
+                .join(User, User.id == Membership.user_id)
                 .where(
                     Membership.tenant_id == self.ctx.tenant_id,
                     Membership.role == "admin",
                     Membership.active.is_(True),
                     Membership.id != row.id,
+                    User.active.is_(True),
+                    User.is_service.is_(False),
                 )
             )
             if not others:

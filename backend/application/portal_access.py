@@ -48,17 +48,22 @@ class PortalContext:
         settings: Settings,
         identity: Principal,
         correlation_id: UUID | None = None,
+        *,
+        administrative_tenant_id: UUID | None = None,
     ) -> None:
         self.db, self.settings, self.identity = db, settings, identity
         self.correlation_id = correlation_id or uuid4()
+        self.administrative_tenant_id = administrative_tenant_id
 
     @property
     def tenant_id(self) -> UUID:
-        return self.identity.tenant_id
+        return self.administrative_tenant_id or self.identity.tenant_id
 
     def validate(
         self, *, lock: bool = False, roles: set[str] | None = None, recent: bool = False
     ) -> datetime:
+        if self.administrative_tenant_id is not None:
+            raise PortalError("permission_denied", 403)
         set_tenant(self.db, self.tenant_id)
         self.db.execute(
             text("SELECT set_config('app.user_id',:u,true)"), {"u": str(self.identity.user_id)}

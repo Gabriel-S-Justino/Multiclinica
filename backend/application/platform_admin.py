@@ -5,23 +5,26 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, text
 
 from backend.application.auth import revoke_user_sessions
+from backend.application.clinic_admin import ClinicAdmin
 from backend.application.pagination import cursor_for, offset_for
 from backend.application.portal_access import PortalContext, PortalError, now
 from backend.application.portal_commands import (
     BreakGlassDecision,
     InvitationDraft,
+    MembershipDraft,
     PlatformUserStatus,
     TenantDraft,
 )
 from backend.infrastructure.db import set_tenant
 from backend.infrastructure.fields import seal, unseal
-from backend.infrastructure.models import Tenant, User, UserProfile
+from backend.infrastructure.models import Professional, Tenant, User, UserProfile
 from backend.infrastructure.portal_models import (
     AdminNotification,
     BreakGlassRequest,
     Invitation,
     PlatformAudit,
     PlatformOperator,
+    ServiceQueue,
 )
 from backend.infrastructure.scheduling_models import Appointment
 from backend.infrastructure.security import digest
@@ -180,6 +183,56 @@ class PlatformAdmin:
                 self.ctx, offset + limit if len(rows) > limit else None, "platform-users", filters
             ),
         }
+
+    def clinic_permissions(self, tenant_id: UUID, limit: int, cursor: str | None) -> dict[str, Any]:
+        self.operator()
+        filters = {"limit": limit, "clinic": str(tenant_id)}
+        offset = offset_for(self.ctx, cursor, "platform-clinic-permissions", filters)
+        clinic = self.permissions_context(tenant_id)
+        items = clinic.memberships(limit=limit + 1, offset=offset)
+        professionals = self.db.execute(
+            select(Professional.id, Professional.display_name)
+            .where(Professional.tenant_id == tenant_id)
+            .order_by(Professional.display_name, Professional.id)
+        )
+        queues = self.db.execute(
+            select(ServiceQueue.id, ServiceQueue.name)
+            .where(ServiceQueue.tenant_id == tenant_id)
+            .order_by(ServiceQueue.name, ServiceQueue.id)
+        )
+        return {
+            "items": items[:limit],
+            "professionals": [{"id": str(id_), "name": name} for id_, name in professionals],
+            "queues": [{"id": str(id_), "name": name} for id_, name in queues],
+            "next_cursor": cursor_for(
+                self.ctx,
+                offset + limit if len(items) > limit else None,
+                "platform-clinic-permissions",
+                filters,
+            ),
+        }
+
+    def save_clinic_permissions(
+        self, tenant_id: UUID, membership_id: UUID, command: MembershipDraft
+    ) -> dict[str, Any]:
+        self.operator(write=True)
+        clinic = self.permissions_context(tenant_id)
+        self.db.execute(text("SELECT public.lock_schedule(:tenant)"), {"tenant": tenant_id})
+        return clinic.update_permissions(command, membership_id)
+
+    def permissions_context(self, tenant_id: UUID) -> ClinicAdmin:
+        if tenant_id == self.ctx.tenant_id or self.db.get(Tenant, tenant_id) is None:
+            raise PortalError()
+        set_tenant(self.db, tenant_id)
+        return ClinicAdmin(
+            PortalContext(
+                self.db,
+                self.ctx.settings,
+                self.ctx.identity,
+                self.ctx.correlation_id,
+                administrative_tenant_id=tenant_id,
+            )
+        )
 
     def set_user_status(self, command: PlatformUserStatus, user_id: UUID) -> dict[str, Any]:
         self.operator(write=True)

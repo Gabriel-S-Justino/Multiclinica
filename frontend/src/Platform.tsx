@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivationCode } from './AccountActivation';
 import { pt } from './locales';
-import { Editor, type Field } from './Management';
+import { clinicRoles, Editor, permissionFields, type Field } from './Management';
 import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, useAction, useRemote } from './ui';
 import type { Membership, Page, RecordData } from './types';
 import type { PersonalDetails } from './Profile';
@@ -9,7 +9,10 @@ import type { PersonalDetails } from './Profile';
 type Clinic = {id:string;name:string;timezone:string;active:boolean;version:number;registration:RecordData|null};
 type PlatformUser = {id:string;login:string;active:boolean;details:PersonalDetails|null;platform_operator:boolean};
 const states = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
-const roles = ['collaborator','reception','admin'].map(value=>({value,label:pt.roles[value]}));
+type PermissionsPage = Page<RecordData> & {
+  professionals: {id:string;name:string}[];
+  queues: {id:string;name:string}[];
+};
 const clinicFields: Field[] = [
   {name:'name',label:'Nome fantasia',group:'Identificação'},
   {name:'legal_name',label:'Razão social',group:'Identificação'},
@@ -38,6 +41,7 @@ export function Platform({member}:{member:Membership}) {
   const [userCursor,setUserCursor]=useState('');
   const [search,setSearch]=useState('');
   const [selected,setSelected]=useState<PlatformUser|null>(null);
+  const [permissionsClinic,setPermissionsClinic]=useState<Clinic|null>(null);
   const tenants=useRemote<Page<Clinic>>(member,`/platform/tenants?limit=50&cursor=${encodeURIComponent(clinicCursor)}`);
   const users=useRemote<Page<PlatformUser>>(member,tab==='users'?`/platform/users?limit=50&search=${encodeURIComponent(search)}&cursor=${encodeURIComponent(userCursor)}`:null);
 
@@ -66,6 +70,7 @@ export function Platform({member}:{member:Membership}) {
           <p className="muted">{[clinic.registration?.document,clinic.registration?.city,clinic.registration?.state].filter(Boolean).join(' · ') || clinic.timezone}</p></div>
           <div className="record-actions">
             {clinic.active&&clinic.id!==member.tenant_id&&<button className="secondary" onClick={()=>{action.clearError();setInvite(clinic);}}>Convidar usuário</button>}
+            {clinic.id!==member.tenant_id&&<button className="secondary" onClick={()=>setPermissionsClinic(clinic)}>{pt.permissions}</button>}
             <button className="secondary" onClick={()=>{action.clearError();setEditing(clinic);}}>{pt.edit}</button>
           </div>
         </article>)}</div>}
@@ -83,16 +88,50 @@ export function Platform({member}:{member:Membership}) {
       {users.data?.next_cursor&&<button className="secondary" onClick={()=>setUserCursor(users.data.next_cursor??'')}>Próxima página</button>}</div>
     </>}
     {editing&&<Editor title={editing.id?pt.edit:pt.newClinic} initial={{...editing,...(editing.registration as RecordData|null)}} fields={clinicFields} busy={action.busy} action={action} onCancel={()=>setEditing(null)} onSave={saveClinic}/>}
-    {invite&&<Editor title={`Convidar usuário · ${invite.name}`} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:roles}]}
+    {invite&&<Editor title={`Convidar usuário · ${invite.name}`} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:clinicRoles}]}
       busy={action.busy} action={action} intro={<p className="note">{pt.inviteHint}</p>} onCancel={()=>setInvite(null)}
       onSave={({login,role})=>void action.run(async()=>{
         const result=await action.send<{activation_code:string}>(`/platform/tenants/${invite.id}/invitations`,{login,role});
         setInvite(null);setCode(result.activation_code);
       },pt.invitationRequested)}/>}
     {code&&<ActivationCode code={code} onClose={()=>setCode('')}/>}
+    {permissionsClinic&&<ClinicPermissions clinic={permissionsClinic} member={member} onClose={()=>setPermissionsClinic(null)}/>}
     {selected&&<UserRecord user={selected} busy={action.busy} action={action} onClose={()=>setSelected(null)}
       onChange={()=>void action.run(async()=>{await action.send(`/platform/users/${selected.id}`,{active:!selected.active},'PATCH');setSelected(null);},pt.saved)}/>}
   </>;
+}
+
+function ClinicPermissions({clinic,member,onClose}:{clinic:Clinic;member:Membership;onClose:()=>void}) {
+  const action=useAction(member);
+  const [cursor,setCursor]=useState('');
+  const [editing,setEditing]=useState<RecordData|null>(null);
+  const path=`/platform/tenants/${clinic.id}/permissions`;
+  const permissions=useRemote<PermissionsPage>(member,`${path}?cursor=${encodeURIComponent(cursor)}`);
+  const page=permissions.data;
+  if(editing&&page) return <Editor title={`${pt.permissions} · ${String(editing.login)}`} initial={editing}
+    action={action} busy={action.busy} onCancel={()=>setEditing(null)}
+    fields={permissionFields(
+      page.professionals.map(item=>({value:item.id,label:item.name})),
+      page.queues.map(item=>({value:item.id,label:item.name})),
+    )}
+    onSave={values=>void action.run(async()=>{
+      await action.send(`${path}/${String(editing.id)}`,values,'PATCH');
+      setEditing(null);
+    },pt.saved)}/>;
+  return <Modal title={`${pt.permissions} · ${clinic.name}`} onClose={onClose}>
+    <Feedback action={action}/>
+    {permissions.isPending?<Loading/>:permissions.isError?<Failure error={permissions.error}/>:
+      !page?.items.length?<Empty icon="user"/>:<div className="record-list">
+        {page.items.map(row=><article className="record-card" key={String(row.id)}>
+          <div><h3>{String(row.login)}</h3><p className="muted">{pt.roles[String(row.role)]} · {row.active?pt.active:pt.inactive}</p></div>
+          <button className="secondary" onClick={()=>{action.clearError();setEditing(row);}}>{pt.edit}</button>
+        </article>)}
+      </div>}
+    <div className="form-actions">
+      {cursor&&<button className="secondary" onClick={()=>setCursor('')}>Primeira página</button>}
+      {page?.next_cursor&&<button className="secondary" onClick={()=>setCursor(page.next_cursor??'')}>Próxima página</button>}
+    </div>
+  </Modal>;
 }
 
 function UserRecord({user,busy,action,onClose,onChange}:{user:PlatformUser;busy:boolean;action:ReturnType<typeof useAction>;onClose:()=>void;onChange:()=>void}) {

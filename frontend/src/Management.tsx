@@ -9,6 +9,18 @@ type Option = {value:string; label:string};
 export type Field = {name:string; label:string; type?:'text'|'number'|'checkbox'|'date'|'time'|'minutes'|'select'|'multi'|'datetime'; options?:Option[]; optional?:boolean; initial?:unknown; when?:{name:string; value:boolean}; group?:string; hint?:string};
 type Values = Record<string, unknown>;
 
+export const clinicRoles = ['collaborator','reception','admin'].map(value=>({value,label:pt.roles[value]}));
+
+export function permissionFields(professionals?: Option[], queues?: Option[]): Field[] {
+  return [
+    {name:'role',label:pt.role,type:'select',options:clinicRoles},
+    {name:'active',label:pt.active,type:'checkbox'},
+    {name:'can_manage_schedule',label:pt.manageSchedule,type:'checkbox'},
+    {name:'professional_ids',label:pt.assignedProfessionals,type:'multi',optional:true,options:professionals},
+    {name:'queue_ids',label:pt.assignedQueues,type:'multi',optional:true,options:queues},
+  ];
+}
+
 /** Formulário genérico de cadastro exibido em uma janela modal, com erros de validação no próprio contexto. */
 export function Editor({title, fields, initial, busy, onSave, onCancel, action, timezone, intro}: {title:string; fields:Field[]; initial?:RecordData; busy:boolean; onSave:(values:RecordData)=>void; onCancel:()=>void; action?:ReturnType<typeof useAction>; timezone?:string; intro?:ReactNode}) {
   const [values,setValues] = useState<Values>(()=>Object.fromEntries(fields.map(field=>{
@@ -87,7 +99,8 @@ export function Services({member}: {member:Membership}) {
 
 export function Team({member}: {member:Membership}) {
   const professionals = useRemote<Page<RecordData>>(member,'/team/professionals');
-  const members = useRemote<Page<RecordData>>(member,'/team/memberships');
+  const [membershipCursor,setMembershipCursor] = useState('');
+  const members = useRemote<Page<RecordData>>(member,`/team/memberships?cursor=${encodeURIComponent(membershipCursor)}`);
   const catalog = useRemote<Catalog>(member,'/portal/catalog');
   const queues = useRemote<Page<Queue>>(member,'/admin/queues');
   const action = useAction(member);
@@ -95,9 +108,8 @@ export function Team({member}: {member:Membership}) {
   const [editMember,setMember] = useState<RecordData|null>(null);
   const [invite,setInvite] = useState(false);
   const [activationCode, setActivationCode] = useState('');
-  const roles = Object.entries(pt.roles).filter(([key])=>key!=='superadmin').map(([value,label])=>({value,label}));
   return <><PageHeader title={pt.team} description={pt.teamDescription}><button className="secondary" onClick={()=>{action.clearError();setInvite(true);}}>{pt.invite}</button><button onClick={()=>{action.clearError();setProfessional({});}}><Icon name="plus" size={16}/>{pt.newProfessional}</button></PageHeader><Feedback action={action}/>
-    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<p className="note">{pt.inviteHint}</p>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:roles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{
+    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<><p className="note">Clínica: {member.clinic_name}</p><p className="note">{pt.inviteHint}</p></>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:clinicRoles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{
       const {version:ignored,...payload}=values;
       void ignored;
       const receipt=await action.send<{activation_code:string}>('/team/invitations',payload);
@@ -112,11 +124,14 @@ export function Team({member}: {member:Membership}) {
     ]} onCancel={()=>setProfessional(null)} onSave={values=>void action.run(async()=>{await action.send(editProfessional.id?`/team/professionals/${editProfessional.id}`:'/team/professionals',values,editProfessional.id?'PATCH':'POST');setProfessional(null);},pt.saved)}/>}
     <section className="panel"><div className="section-heading"><h2>{pt.professionals}</h2></div>{professionals.isPending?<Loading/>:professionals.isError?<Failure error={professionals.error}/>:<Cards icon="team" rows={professionals.data.items} label="display_name" onEdit={row=>{action.clearError();setProfessional(row);}}>{row=>Array.isArray(row.service_ids)&&row.service_ids.length>0?<p className="muted">{row.service_ids.map(id=>catalog.data?.services.find(item=>item.id===id)?.name).filter(Boolean).join(' · ')}</p>:null}</Cards>}</section>
     <section className="panel"><div className="section-heading"><h2>{pt.memberships}</h2></div>{members.isPending?<Loading/>:members.isError?<Failure error={members.error}/>:<Cards icon="user" rows={members.data.items} label="login" onEdit={row=>{action.clearError();setMember(row);}}>{row=><p className="muted">{pt.roles[String(row.role)]}</p>}</Cards>}</section>
-    {editMember && <Editor title={`${pt.permissions}: ${String(editMember.login)}`} initial={editMember} busy={action.busy} action={action} fields={[
-      {name:'role',label:pt.role,type:'select',options:roles},{name:'active',label:pt.active,type:'checkbox'},{name:'can_manage_schedule',label:pt.manageSchedule,type:'checkbox'},
-      {name:'professional_ids',label:pt.assignedProfessionals,type:'multi',optional:true,options:professionals.data?.items.map(item=>({value:String(item.id),label:String(item.display_name)}))},
-      {name:'queue_ids',label:pt.assignedQueues,type:'multi',optional:true,options:queues.data?.items.map(item=>({value:item.id,label:item.name}))},
-    ]} onCancel={()=>setMember(null)} onSave={values=>void action.run(async()=>{await action.send(`/team/memberships/${editMember.id}`,values,'PATCH');setMember(null);},pt.saved)}/>}
+    <div className="form-actions">
+      {membershipCursor&&<button className="secondary" onClick={()=>setMembershipCursor('')}>Primeira página</button>}
+      {members.data?.next_cursor&&<button className="secondary" onClick={()=>setMembershipCursor(members.data.next_cursor??'')}>Próxima página</button>}
+    </div>
+    {editMember && <Editor title={`${pt.permissions}: ${String(editMember.login)}`} initial={editMember} busy={action.busy} action={action} fields={permissionFields(
+      professionals.data?.items.map(item=>({value:String(item.id),label:String(item.display_name)})),
+      queues.data?.items.map(item=>({value:item.id,label:item.name})),
+    )} onCancel={()=>setMember(null)} onSave={values=>void action.run(async()=>{await action.send(`/team/memberships/${editMember.id}`,values,'PATCH');setMember(null);},pt.saved)}/>}
   </>;
 }
 
