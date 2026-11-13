@@ -407,6 +407,7 @@ tbody tr:hover { background: var(--green-50); }
 .auth-form { width: 100%; max-width: 380px; }
 .auth-title { font-size: 28px; letter-spacing: -0.5px; margin-bottom: 22px; }
 .auth-form form { display: grid; gap: 16px; }
+.authenticator-qr { display: block; width: 240px; max-width: 100%; height: auto; justify-self: center; image-rendering: pixelated; }
 .auth-form .full { margin-top: 4px; min-height: 46px; font-size: 15px; }
 .reveal-toggle { justify-self: start; font-size: 13px; margin-top: -6px; }
 .auth-help { display: flex; flex-direction: column; gap: 6px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import qrcode from 'qrcode-generator';
 import { api } from './api';
 import { pt } from './locales';
 import { ProfileFields, profileFields } from './Profile';
@@ -13,6 +14,42 @@ export function ActivationCode({ code, onClose, hint = pt.activationShare }: {
       <input readOnly value={code} onFocus={event => event.target.select()} />
     </Label>
   </Modal>;
+}
+
+function AuthenticatorQr({ login, secret }: { login: string; secret: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const element = canvas.current;
+    const context = element?.getContext('2d');
+    if (!element || !context) return;
+
+    const issuer = 'Multiclinica';
+    const account = Array.from(login.trim().toLowerCase().replaceAll(':', ' ')).slice(0, 80).join('');
+    const params = new URLSearchParams({ secret, issuer });
+    const uri = `otpauth://totp/${issuer}:${encodeURIComponent(account)}?${params}`;
+    const qr = qrcode(0, 'M');
+    qr.addData(uri);
+    qr.make();
+
+    const modules = qr.getModuleCount();
+    const quietZone = 4;
+    const scale = 6;
+    const size = (modules + quietZone * 2) * scale;
+    element.width = element.height = size;
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, size, size);
+    context.fillStyle = '#000';
+    for (let row = 0; row < modules; row++) {
+      for (let column = 0; column < modules; column++) {
+        if (qr.isDark(row, column)) {
+          context.fillRect((column + quietZone) * scale, (row + quietZone) * scale, scale, scale);
+        }
+      }
+    }
+  }, [login, secret]);
+
+  return <canvas ref={canvas} className="authenticator-qr" role="img" aria-label={pt.activationQrLabel} />;
 }
 
 export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => Promise<unknown> }) {
@@ -50,10 +87,15 @@ export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => 
     <Feedback action={action} />
     <form onSubmit={submit}>
       {authenticatorKey ? <>
+        <p className="note">{pt.activationQrHint}</p>
+        <AuthenticatorQr login={login} secret={authenticatorKey} />
+        <details>
+          <summary>{pt.activationManual}</summary>
+          <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
+            <input readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
+          </Label>
+        </details>
         <ProfileFields email={login.includes('@') ? login.trim() : undefined} />
-        <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
-          <input readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
-        </Label>
         <Label text={pt.newPassword} hint={pt.passwordRule}>
           <input type="password" autoComplete="new-password" minLength={12} maxLength={128}
             required value={password} onChange={event => setPassword(event.target.value)} />
