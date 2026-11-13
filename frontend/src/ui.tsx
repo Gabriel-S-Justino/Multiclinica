@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { pt } from './locales';
@@ -95,8 +95,17 @@ export function Label({text, hint, children}: {text: string; hint?: string; chil
 
 export function Modal({title, children, onClose, size}: {title: string; children: ReactNode; onClose: () => void; size?: 'wide' | 'narrow'}) {
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const element = dialog.current; element?.showModal(); return () => element?.close(); }, []);
-  return <dialog ref={dialog} className={size ? `dialog-${size}` : undefined} aria-labelledby="dialog-title" onCancel={(event) => {event.preventDefault(); onClose();}}><div className="dialog-header"><h2 id="dialog-title">{title}</h2><button type="button" className="icon-button ghost" onClick={onClose} aria-label={pt.close}><Icon name="close"/></button></div><div className="dialog-body">{children}</div></dialog>;
+  const titleId = useId();
+  useEffect(() => {
+    const element = dialog.current;
+    const trigger = document.activeElement;
+    element?.showModal();
+    return () => {
+      element?.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({preventScroll:true});
+    };
+  }, []);
+  return <dialog ref={dialog} className={size ? `dialog-${size}` : undefined} aria-labelledby={titleId} onCancel={(event) => {event.preventDefault(); onClose();}}><div className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button ghost" onClick={onClose} aria-label={pt.close}><Icon name="close"/></button></div><div className="dialog-body">{children}</div></dialog>;
 }
 
 /** Botão que pede confirmação explícita antes de uma ação destrutiva. */

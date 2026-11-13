@@ -110,6 +110,14 @@ function AccountPassword({onClose,onChanged}: {onClose:()=>void;onChanged:()=>Pr
   </Modal>;
 }
 
+function AccountPage({role,onPasswordChanged}: {role:string;onPasswordChanged:()=>Promise<unknown>}) {
+  const [passwordOpen,setPasswordOpen]=useState(false);
+  return <>
+    <Profile role={role} onPassword={()=>setPasswordOpen(true)}/>
+    {passwordOpen&&<AccountPassword onClose={()=>setPasswordOpen(false)} onChanged={onPasswordChanged}/>}
+  </>;
+}
+
 const navigation:{path:string;title:string;icon:IconName;cap:string}[]=[
   {path:'/agenda',title:pt.agenda,icon:'calendar',cap:'agenda.read'},{path:'/inbox',title:pt.inbox,icon:'inbox',cap:'inbox.read'},
   {path:'/schedules',title:pt.schedules,icon:'clock',cap:'agenda.read'},{path:'/services',title:pt.services,icon:'services',cap:'services.manage'},
@@ -118,6 +126,7 @@ const navigation:{path:string;title:string;icon:IconName;cap:string}[]=[
   {path:'/support',title:pt.supportRequests,icon:'shield',cap:'support.review'}];
 
 const platformHome = '/admin';
+const platformAccount = `${platformHome}/account`;
 const platformTitle = 'Administração da plataforma';
 const platformNavigation = [
   {path:platformHome, section:'overview', title:'Visão geral', icon:'services'},
@@ -134,7 +143,9 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
   const legacyPlatformPath=useMatch('/clinics');
   const inPlatform=Boolean(session.platform_access && (platformPath || legacyPlatformPath || !member));
   const workspaceMember=inPlatform?platformMember:member;
-  const [accountOpen,setAccountOpen]=useState<'profile'|'password'|null>(null);
+  const personalAccountPath=useMatch('/account');
+  const platformAccountPath=useMatch(platformAccount);
+  const accountPath=personalAccountPath || (inPlatform && platformAccountPath);
   const [menuOpen,setMenuOpen]=useState(false);
   useEffect(()=>{setMenuOpen(false);document.getElementById('page-title')?.focus({preventScroll:false});},[location.pathname]);
   useEffect(()=>{if(!menuOpen)return;function escape(event:KeyboardEvent){if(event.key==='Escape')setMenuOpen(false);}window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[menuOpen]);
@@ -154,11 +165,13 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
       <button type="button" className="icon-button ghost menu-toggle" aria-label={pt.openMenu} aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={()=>setMenuOpen(true)}><Icon name="menu"/></button>
       <div className="topbar-context"><strong>{inPlatform?platformTitle:member?.clinic_name??pt.title}</strong>{!inPlatform&&member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{member.timezone}</span>}</div>
       <div className="account">
-        <button type="button" className="ghost account-button" onClick={()=>setAccountOpen('profile')}><Icon name="user" size={16}/><span>{pt.myAccount}</span></button>
+        <NavLink to={inPlatform?platformAccount:'/account'} className="account-link" onClick={()=>setMenuOpen(false)}>
+          <Icon name="user" size={18}/><span>{pt.myAccount}</span>
+        </NavLink>
         <button type="button" className="ghost account-button" onClick={()=>void onLogout()}><Icon name="logout" size={16}/><span>{pt.logout}</span></button></div>
     </header>
-    <main id="workspace-content" tabIndex={-1}>{!inPlatform&&<Invitations onAccepted={onAccepted}/>}
-    {switching?<Loading/>:inPlatform?<Routes>
+    <main id="workspace-content" tabIndex={-1}>{!inPlatform&&!accountPath&&<Invitations onAccepted={onAccepted}/>}
+    {switching?<Loading/>:accountPath?<AccountPage role={role} onPasswordChanged={onPasswordChanged}/>:inPlatform?<Routes>
       {platformNavigation.map(item=><Route key={item.path} path={item.path} element={
         <Platform key={item.section} section={item.section} title={item.title} member={platformMember} userId={session.user_id}/>
       }/>)}
@@ -175,8 +188,6 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
       <Route path="/support" element={<Allowed member={member} capability="support.review"><SupportReviews member={member}/></Allowed>}/>
       <Route path="*" element={<Navigate to="/agenda" replace/>}/>
     </Routes>}</main></div></div>
-    {accountOpen==='profile'&&<Profile role={role} onClose={()=>setAccountOpen(null)} onPassword={()=>setAccountOpen('password')}/>}
-    {accountOpen==='password'&&<AccountPassword onClose={()=>setAccountOpen('profile')} onChanged={onPasswordChanged}/>}
   </>;
 }
 

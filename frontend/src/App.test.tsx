@@ -50,3 +50,33 @@ test('abre as seções da plataforma pelo menu lateral do Superadmin', async () 
     }
   }
 });
+
+test('Minha conta mantém a navegação da plataforma e permite salvar o perfil', async () => {
+  const profile = {
+    login: 'operator@test.invalid',
+    has_photo: false,
+    details: {full_name:'Ana Souza', email:'operator@test.invalid', phone:'85999990000'},
+  };
+  const fetch = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url.endsWith('/auth/session')) {
+      return Response.json({user_id:'u', active_membership_id:null, memberships:[], platform_access:true});
+    }
+    if (url.endsWith('/auth/profile') && options?.method === 'PUT') {
+      profile.details = JSON.parse(String(options.body));
+      return new Response(null, {status:204});
+    }
+    if (url.endsWith('/auth/profile')) return Response.json(profile);
+    return Response.json({items:[]});
+  });
+  vi.stubGlobal('fetch', fetch);
+  mount('/admin/users');
+  fireEvent.click(await screen.findByRole('link', {name:'Minha conta'}));
+  expect(await screen.findByRole('heading', {name:'Ana Souza'})).toBeInTheDocument();
+  expect(screen.getByRole('navigation', {name:'Administração da plataforma'})).toBeInTheDocument();
+  expect(screen.getByText('Superadmin')).toBeInTheDocument();
+  expect(screen.getByRole('button', {name:'Alterar senha'})).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Nome completo'), {target:{value:'Ana Lima'}});
+  fireEvent.click(screen.getByRole('button', {name:'Salvar dados pessoais'}));
+  expect(await screen.findByRole('heading', {name:'Ana Lima'})).toBeInTheDocument();
+  expect(await screen.findByText('Dados pessoais salvos.')).toBeInTheDocument();
+});
