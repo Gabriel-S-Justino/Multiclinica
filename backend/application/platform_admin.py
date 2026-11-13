@@ -2,20 +2,20 @@ from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
+from backend.application.auth import revoke_user_sessions
 from backend.application.pagination import cursor_for, offset_for
 from backend.application.portal_access import PortalContext, PortalError, now
 from backend.application.portal_commands import (
     BreakGlassDecision,
-    BreakGlassDraft,
     InvitationDraft,
+    PlatformUserStatus,
     TenantDraft,
 )
-from backend.application.portal_read import PortalRead
 from backend.infrastructure.db import set_tenant
 from backend.infrastructure.fields import seal, unseal
-from backend.infrastructure.models import Tenant
+from backend.infrastructure.models import Tenant, User, UserProfile
 from backend.infrastructure.portal_models import (
     AdminNotification,
     BreakGlassRequest,
@@ -66,6 +66,7 @@ class PlatformAdmin:
                     "timezone": row.timezone,
                     "active": row.active,
                     "version": row.version,
+                    "registration": row.registration,
                 }
                 for row in rows[:limit]
             ],
@@ -98,6 +99,10 @@ class PlatformAdmin:
         )
         if not row.name:
             raise PortalError("validation_failed", 422)
+        if tenant_id is None and command.registration is None:
+            raise PortalError("clinic_registration_required", 422)
+        if command.registration is not None:
+            row.registration = command.registration.model_dump()
         self.db.add(row)
         self.audit(row.id, "tenant.saved", row.id)
         return self.ctx.save(
@@ -105,14 +110,17 @@ class PlatformAdmin:
         )
 
     def invite_administrator(self, command: InvitationDraft, tenant_id: UUID) -> dict[str, Any]:
-        self.operator(write=True)
         if command.role != "admin":
             raise PortalError("validation_failed", 422)
+        return self.invite_user(command, tenant_id)
+
+    def invite_user(self, command: InvitationDraft, tenant_id: UUID) -> dict[str, Any]:
+        self.operator(write=True)
         replay = self.ctx.replay("tenant.admin_invite", command, tenant_id)
         if replay is not None:
             return replay
         tenant = self.db.get(Tenant, tenant_id)
-        if not tenant or not tenant.active:
+        if not tenant or not tenant.active or tenant_id == self.ctx.tenant_id:
             raise PortalError()
         moment, invitation_id = now(self.db), uuid4()
         login = command.login.strip().lower()
@@ -125,7 +133,7 @@ class PlatformAdmin:
                 login_ciphertext=seal(
                     self.ctx.settings, tenant_id, "invitation", invitation_id, "login", login
                 ),
-                role="admin",
+                role=command.role,
                 created_at=moment,
                 expires_at=moment + timedelta(days=7),
             )
@@ -133,7 +141,7 @@ class PlatformAdmin:
         self.ctx.audit("invitation.requested", invitation_id, tenant_id=tenant_id)
         self.db.flush()
         set_tenant(self.db, self.ctx.tenant_id)
-        self.audit(tenant_id, "tenant.admin_invited", invitation_id)
+        self.audit(tenant_id, "tenant.user_invited", invitation_id)
         return self.ctx.save(
             "tenant.admin_invite",
             command,
@@ -141,66 +149,54 @@ class PlatformAdmin:
             tenant_id,
         )
 
-    def request_access(self, command: BreakGlassDraft) -> dict[str, Any]:
-        self.operator(write=True)
-        replay = self.ctx.replay("breakglass.request", command)
-        if replay is not None:
-            return replay
-        tenant = self.db.get(Tenant, command.tenant_id)
-        if not tenant or not tenant.active or tenant.id == self.ctx.tenant_id:
-            raise PortalError()
-        request_id, moment = uuid4(), now(self.db)
-        set_tenant(self.db, tenant.id)
-        self.db.add(
-            BreakGlassRequest(
-                id=request_id,
-                tenant_id=tenant.id,
-                requester_user_id=self.ctx.identity.user_id,
-                appointment_id=command.appointment_id,
-                duration_minutes=command.duration_minutes,
-                reason_ciphertext=seal(
-                    self.ctx.settings, tenant.id, "breakglass", request_id, "reason", command.reason
-                ),
-                created_at=moment,
-            )
-        )
-        self.db.add(
-            AdminNotification(
-                tenant_id=tenant.id,
-                notification_type="breakglass.requested",
-                resource_id=request_id,
-                created_at=moment,
-            )
-        )
-        self.ctx.audit("breakglass.requested", request_id, tenant_id=tenant.id)
-        self.db.flush()
-        set_tenant(self.db, self.ctx.tenant_id)
-        self.audit(tenant.id, "breakglass.requested", request_id)
-        return self.ctx.save(
-            "breakglass.request", command, {"id": str(request_id), "status": "pending"}
-        )
-
-    def my_requests(self) -> dict[str, Any]:
+    def users(self, limit: int, cursor: str | None, search: str) -> dict[str, Any]:
         self.operator()
-        rows = self.db.scalars(
-            select(BreakGlassRequest)
-            .where(BreakGlassRequest.requester_user_id == self.ctx.identity.user_id)
-            .order_by(BreakGlassRequest.created_at.desc())
-            .limit(50)
+        filters = {"limit": limit, "search": search}
+        offset = offset_for(self.ctx, cursor, "platform-users", filters)
+        statement = (
+            select(User.id, User.login, User.active, UserProfile.details, PlatformOperator.active)
+            .outerjoin(UserProfile, UserProfile.user_id == User.id)
+            .outerjoin(PlatformOperator, PlatformOperator.user_id == User.id)
+            .where(User.is_service.is_(False))
         )
+        if search:
+            statement = statement.where(
+                User.login.icontains(search, autoescape=True)
+                | UserProfile.details["full_name"].astext.icontains(search, autoescape=True)
+            )
+        rows = self.db.execute(statement.order_by(User.login).offset(offset).limit(limit + 1)).all()
         return {
             "items": [
                 {
-                    "id": str(row.id),
-                    "tenant_id": str(row.tenant_id),
-                    "appointment_id": str(row.appointment_id),
-                    "status": row.status,
-                    "version": row.version,
-                    "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+                    "id": str(user_id),
+                    "login": login,
+                    "active": active,
+                    "details": details,
+                    "platform_operator": bool(operator),
                 }
-                for row in rows
-            ]
+                for user_id, login, active, details, operator in rows[:limit]
+            ],
+            "next_cursor": cursor_for(
+                self.ctx, offset + limit if len(rows) > limit else None, "platform-users", filters
+            ),
         }
+
+    def set_user_status(self, command: PlatformUserStatus, user_id: UUID) -> dict[str, Any]:
+        self.operator(write=True)
+        replay = self.ctx.replay("platform.user_status", command, user_id)
+        if replay is not None:
+            return replay
+        changed = self.db.scalar(
+            text("SELECT public.set_platform_user_active(:user_id, :active)"),
+            {"user_id": user_id, "active": command.active},
+        )
+        if not changed:
+            raise PortalError("permission_denied", 403)
+        revoke_user_sessions(self.db, user_id)
+        self.audit(self.ctx.tenant_id, "user.status_changed", user_id)
+        return self.ctx.save(
+            "platform.user_status", command, {"id": str(user_id), "active": command.active}, user_id
+        )
 
     def clinic_requests(self) -> dict[str, Any]:
         self.ctx.admin()
@@ -275,45 +271,3 @@ class PlatformAdmin:
             {"id": str(row.id), "status": row.status, "version": row.version},
             request_id,
         )
-
-    def read_access(self, request_id: UUID) -> dict[str, Any]:
-        self.operator(write=True)
-        row = self.db.scalar(
-            select(BreakGlassRequest).where(
-                BreakGlassRequest.id == request_id,
-                BreakGlassRequest.requester_user_id == self.ctx.identity.user_id,
-            )
-        )
-        if row is None:
-            raise PortalError()
-        set_tenant(self.db, row.tenant_id)
-        self.db.execute(select(1))
-        self.db.refresh(row, with_for_update=True)
-        moment = now(self.db)
-        if (
-            row.status != "approved"
-            or row.expires_at is None
-            or moment >= row.expires_at
-            or row.approved_by_user_id is None
-        ):
-            raise PortalError("exceptional_access_denied", 403)
-        tenant = self.db.get(Tenant, row.tenant_id)
-        if not tenant or not tenant.active:
-            raise PortalError("exceptional_access_denied", 403)
-        appointment: Appointment | None = (
-            self.ctx.entity(Appointment, row.appointment_id)
-            if row.tenant_id == self.ctx.tenant_id
-            else self.db.scalar(
-                select(Appointment).where(
-                    Appointment.tenant_id == row.tenant_id, Appointment.id == row.appointment_id
-                )
-            )
-        )
-        if appointment is None:
-            raise PortalError()
-        result = PortalRead(self.ctx).describe(appointment, exceptional=True)
-        self.ctx.audit("breakglass.read", appointment.id, tenant_id=row.tenant_id)
-        self.db.flush()
-        set_tenant(self.db, self.ctx.tenant_id)
-        self.audit(row.tenant_id, "breakglass.read", row.id)
-        return {"appointment": result, "expires_at": row.expires_at.isoformat(), "read_only": True}

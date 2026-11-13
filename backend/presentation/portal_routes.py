@@ -15,7 +15,6 @@ from backend.application.portal_access import PortalContext, PortalError
 from backend.application.portal_commands import (
     BlockDraft,
     BreakGlassDecision,
-    BreakGlassDraft,
     ChannelProvisionDraft,
     ClinicPolicyDraft,
     ExceptionDraft,
@@ -23,6 +22,7 @@ from backend.application.portal_commands import (
     IntegrationDraft,
     InvitationDraft,
     MembershipDraft,
+    PlatformUserStatus,
     ProfessionalDraft,
     QueueDraft,
     ReplyDraft,
@@ -587,20 +587,41 @@ def register_portal_routes(
             settings, PlatformAdmin(ctx).invite_administrator(command, tenant_id)
         )
 
-    @app.get("/v1/platform/break-glass")
-    def my_access_requests(ctx: PortalContext = Depends(context)) -> dict[str, Any]:
-        return PlatformAdmin(ctx).my_requests()
-
-    @app.post("/v1/platform/break-glass", status_code=202)
-    def request_access(
-        command: BreakGlassDraft, request: Request, ctx: PortalContext = Depends(context)
+    @app.post("/v1/platform/tenants/{tenant_id}/invitations", status_code=202)
+    def platform_invite(
+        tenant_id: UUID,
+        command: InvitationDraft,
+        request: Request,
+        ctx: PortalContext = Depends(context),
     ) -> dict[str, Any]:
         keyed(request, command)
-        return PlatformAdmin(ctx).request_access(command)
+        return invitations.activation_receipt(
+            settings, PlatformAdmin(ctx).invite_user(command, tenant_id)
+        )
 
-    @app.get("/v1/platform/break-glass/{request_id}/appointment")
-    def exceptional_read(request_id: UUID, ctx: PortalContext = Depends(context)) -> dict[str, Any]:
-        return PlatformAdmin(ctx).read_access(request_id)
+    @app.get("/v1/platform/users")
+    def platform_users(
+        limit: int = Query(25, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=2048),
+        search: str = Query("", max_length=254),
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        return PlatformAdmin(ctx).users(limit, cursor, search.strip())
+
+    @app.patch("/v1/platform/users/{user_id}")
+    def platform_user_status(
+        user_id: UUID,
+        command: PlatformUserStatus,
+        request: Request,
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).set_user_status(command, user_id)
+
+    @app.api_route("/v1/platform/break-glass", methods=["GET", "POST"], include_in_schema=False)
+    @app.get("/v1/platform/break-glass/{request_id}/appointment", include_in_schema=False)
+    def retired_platform_access(request_id: UUID | None = None) -> None:
+        raise PortalError("not_found", 404)
 
     for route in app.routes:
         if (

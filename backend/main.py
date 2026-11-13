@@ -1,3 +1,5 @@
+import base64
+import binascii
 import hmac
 import json
 import logging
@@ -13,16 +15,18 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import Engine, select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.application import auth, invitations, portal
+from backend.application.identity_details import PersonalDetails
 from backend.application.portal_access import PortalError
 from backend.application.portal_session import capabilities
 from backend.config import Settings
 from backend.domain.scheduling import SchedulingError
 from backend.infrastructure.db import make_engine, transaction
-from backend.infrastructure.models import Membership, PortalSession, Tenant
+from backend.infrastructure.models import Membership, PortalSession, Tenant, User, UserProfile
 from backend.infrastructure.portal_models import PlatformOperator
 from backend.infrastructure.rate_limit import consume
 from backend.infrastructure.security import digest
@@ -33,6 +37,7 @@ from backend.presentation.schemas import (
     InvitationActivation,
     Login,
     PasswordChange,
+    ProfilePhoto,
     RecoveryConfirm,
     RecoveryRequest,
     SelectMembership,
@@ -100,6 +105,26 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         response.set_cookie(COOKIE, raw, httponly=True, secure=True, samesite="lax", path="/")
         response.set_cookie(
             CSRF_COOKIE, csrf, httponly=False, secure=True, samesite="lax", path="/"
+        )
+
+    def select_platform_home(db: Session, raw: str) -> None:
+        session = auth.get_session(db, settings, raw)
+        if not session.mfa_verified:
+            return
+        operator = db.get(PlatformOperator, session.user_id)
+        if not operator or not operator.active:
+            return
+        session.membership_id = db.scalar(
+            select(Membership.id)
+            .join(Tenant, Tenant.id == Membership.tenant_id)
+            .where(
+                Membership.user_id == session.user_id,
+                Membership.role == "superadmin",
+                Membership.active.is_(True),
+                Tenant.active.is_(True),
+            )
+            .order_by(Membership.id)
+            .limit(1)
         )
 
     def login_origin(request: Request) -> None:
@@ -293,6 +318,8 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         login_origin(request)
         throttle(request, "mfa", command.challenge)
         raw, csrf = auth.verify_mfa(db, settings, command.challenge, command.code)
+        db.flush()
+        select_platform_home(db, raw)
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
 
@@ -327,6 +354,7 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             command.authenticator_key.get_secret_value(),
             command.code,
             UUID(request.state.correlation_id),
+            command.profile,
         )
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
@@ -365,6 +393,64 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
                 for item, tenant in memberships
             ],
         }
+
+    @app.get("/v1/auth/profile")
+    def own_profile(
+        session: PortalSession = Depends(current),
+        db: Session = Depends(db_session, scope="function"),
+    ) -> dict[str, Any]:
+        user = db.get(User, session.user_id)
+        if user is None:
+            raise auth.AuthError
+        profile = db.get(UserProfile, user.id)
+        return {
+            "login": user.login,
+            "details": profile.details if profile else None,
+            "has_photo": bool(profile and profile.photo),
+        }
+
+    @app.put("/v1/auth/profile", status_code=204)
+    def save_profile(
+        command: PersonalDetails,
+        session: PortalSession = Depends(current),
+        db: Session = Depends(db_session, scope="function"),
+    ) -> None:
+        details = command.model_dump()
+        db.execute(
+            insert(UserProfile)
+            .values(user_id=session.user_id, details=details)
+            .on_conflict_do_update(index_elements=[UserProfile.user_id], set_={"details": details})
+        )
+
+    @app.get("/v1/auth/profile/photo")
+    def own_photo(
+        session: PortalSession = Depends(current),
+        db: Session = Depends(db_session, scope="function"),
+    ) -> Response:
+        photo = db.scalar(select(UserProfile.photo).where(UserProfile.user_id == session.user_id))
+        if not photo:
+            raise HTTPException(404, "not_found")
+        return Response(photo, media_type="image/jpeg")
+
+    @app.put("/v1/auth/profile/photo", status_code=204)
+    def save_photo(
+        command: ProfilePhoto,
+        session: PortalSession = Depends(current),
+        db: Session = Depends(db_session, scope="function"),
+    ) -> None:
+        photo = None
+        if command.jpeg is not None:
+            try:
+                photo = base64.b64decode(command.jpeg, validate=True)
+            except (ValueError, binascii.Error) as exc:
+                raise PortalError("invalid_photo", 422) from exc
+            if not photo.startswith(b"\xff\xd8\xff") or not photo.endswith(b"\xff\xd9"):
+                raise PortalError("invalid_photo", 422)
+        db.execute(
+            insert(UserProfile)
+            .values(user_id=session.user_id, photo=photo)
+            .on_conflict_do_update(index_elements=[UserProfile.user_id], set_={"photo": photo})
+        )
 
     @app.post("/v1/auth/active-membership")
     def active_membership(

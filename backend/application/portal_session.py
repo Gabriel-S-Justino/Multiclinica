@@ -3,7 +3,7 @@ from backend.infrastructure.models import Membership
 
 def capabilities(member: Membership, platform_operator: bool, mfa_verified: bool) -> list[str]:
     if member.role == "superadmin":
-        return ["platform.manage", "support.request"] if platform_operator and mfa_verified else []
+        return ["platform.manage"] if platform_operator and mfa_verified else []
     result = ["agenda.read", "appointments.write"]
     if member.role == "admin" or member.can_manage_schedule:
         result.append("schedules.manage")

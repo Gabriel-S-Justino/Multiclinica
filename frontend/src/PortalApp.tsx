@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { AccountActivation } from './AccountActivation';
@@ -7,6 +7,7 @@ import { Agenda } from './Agenda';
 import { Audit, IntegrationPage, Schedules, Services, Settings, SupportReviews, Team } from './Management';
 import { InboxPage } from './InboxPage';
 import { Platform } from './Platform';
+import { Profile } from './Profile';
 import { pt } from './locales';
 import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, useAction, useRemote, type IconName } from './ui';
 import type { Membership, Page, Professional, Session } from './types';
@@ -120,7 +121,7 @@ function initials(text:string) {return text.split(/\s+/).filter(Boolean).slice(0
 
 function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching,onAccepted}: {session:Session;member?:Membership;onSwitch:(id:string)=>Promise<void>;onLogout:()=>Promise<void>;onPasswordChanged:()=>Promise<unknown>;switching:boolean;onAccepted:()=>Promise<unknown>}) {
   const location=useLocation();
-  const [accountOpen,setAccountOpen]=useState(false);
+  const [accountOpen,setAccountOpen]=useState<'profile'|'password'|null>(null);
   const [menuOpen,setMenuOpen]=useState(false);
   useEffect(()=>{setMenuOpen(false);document.getElementById('page-title')?.focus({preventScroll:false});},[location.pathname]);
   useEffect(()=>{if(!menuOpen)return;function escape(event:KeyboardEvent){if(event.key==='Escape')setMenuOpen(false);}window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[menuOpen]);
@@ -136,7 +137,7 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
       <button type="button" className="icon-button ghost menu-toggle" aria-label={pt.openMenu} aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={()=>setMenuOpen(true)}><Icon name="menu"/></button>
       <div className="topbar-context"><strong>{member?.clinic_name??pt.title}</strong>{member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{member.timezone}</span>}</div>
       <div className="account"><span className="avatar" aria-hidden="true">{initials(role)}</span><span className="account-role">{role}</span>
-        <button type="button" className="ghost account-button" onClick={()=>setAccountOpen(true)}><Icon name="user" size={16}/><span>{pt.myAccount}</span></button>
+        <button type="button" className="ghost account-button" onClick={()=>setAccountOpen('profile')}><Icon name="user" size={16}/><span>{pt.myAccount}</span></button>
         <button type="button" className="ghost account-button" onClick={()=>void onLogout()}><Icon name="logout" size={16}/><span>{pt.logout}</span></button></div>
     </header>
     <main id="workspace-content" tabIndex={-1}><Invitations onAccepted={onAccepted}/>{switching?<Loading/>:!member?<><PageHeader title={pt.choose}/><Empty icon="building">{pt.selectClinic}</Empty></>:<Routes>
@@ -151,19 +152,30 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
       <Route path="/support" element={<Allowed member={member} capability="support.review"><SupportReviews member={member}/></Allowed>}/>
       <Route path="/clinics" element={<Allowed member={member} capability="platform.manage"><Platform member={member}/></Allowed>}/>
       <Route path="*" element={<Navigate to={home} replace/>}/>
-    </Routes>}</main></div></div>{accountOpen&&<AccountPassword onClose={()=>setAccountOpen(false)} onChanged={onPasswordChanged}/>}</>;
+    </Routes>}</main></div></div>
+    {accountOpen==='profile'&&<Profile onClose={()=>setAccountOpen(null)} onPassword={()=>setAccountOpen('password')}/>}
+    {accountOpen==='password'&&<AccountPassword onClose={()=>setAccountOpen('profile')} onChanged={onPasswordChanged}/>}
+  </>;
 }
 
 export function App() {
+  const navigate=useNavigate();
   const client=useQueryClient();const session=useQuery({queryKey:['session'],queryFn:()=>api<Session>('/auth/session'),retry:false});
   const [switching,setSwitching]=useState(false);const [passwordChanged,setPasswordChanged]=useState(false);const action=useAction();
   const refetch=session.refetch;
   useEffect(()=>{function expire(){client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});void refetch();}window.addEventListener('clinic:session-expired',expire);return()=>window.removeEventListener('clinic:session-expired',expire);},[client,refetch]);
   const unauthenticated=session.isError&&session.error instanceof ApiError&&session.error.status===401;
   useEffect(()=>{if(unauthenticated)document.title=`${pt.signIn} · ${pt.title}`;},[unauthenticated]);
-  async function authenticated(){setPasswordChanged(false);client.clear();return refetch();}
+  async function authenticated(){
+    setPasswordChanged(false);
+    client.clear();
+    const result=await refetch();
+    const active=result.data?.memberships.find(item=>item.id===result.data?.active_membership_id);
+    if(active?.capabilities?.includes('platform.manage')) navigate('/clinics',{replace:true});
+    return result;
+  }
   async function passwordChangedSuccessfully(){setPasswordChanged(true);client.clear();return refetch();}
-  async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});await refetch();});setSwitching(false);}
+  async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});const result=await refetch();const member=result.data?.memberships.find(item=>item.id===id);navigate(member?.capabilities?.includes('platform.manage')?'/clinics':'/agenda',{replace:true});});setSwitching(false);}
   async function logout(){await action.run(async()=>{await api('/auth/logout',{});client.clear();await refetch();});}
   if(session.isPending)return <main className="startup"><Loading/></main>;
   if(session.isError){if(unauthenticated)return <Login onAuthenticated={authenticated} info={passwordChanged?pt.passwordChanged:undefined}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}><Icon name="refresh" size={16}/>{pt.refresh}</button></main>;}

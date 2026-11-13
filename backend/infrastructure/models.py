@@ -7,10 +7,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    LargeBinary,
     String,
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -36,6 +38,14 @@ class Tenant(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="America/Sao_Paulo")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     version: Mapped[int] = mapped_column(default=0)
+    registration: Mapped[dict[str, str | None] | None] = mapped_column(JSONB)
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    details: Mapped[dict[str, str | None] | None] = mapped_column(JSONB)
+    photo: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
 
 
 class Membership(Base):

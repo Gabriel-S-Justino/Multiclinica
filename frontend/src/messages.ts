@@ -115,6 +115,8 @@ export const pt = {
   reasons: {patient_request:'Pedido do contato',financial:'Financeiro',administrative:'Administrativo',identity_verification:'Verificação de identidade',other:'Outro'} as Record<string,string>,
   weekdays:['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'],
   errors: {channel_already_exists:'Esta clínica já possui um número vinculado.', channel_provision_failed:'Não foi possível criar o canal. A migração administrativa deve estar aplicada.', integration_incomplete:'Preencha todas as informações obrigatórias antes de verificar.', invalid_integration_fields:'Confira identificadores, versão da API, fila e credenciais.', provider_verification_failed:'O provedor rejeitou a conexão. Revise a chave, permissões e os identificadores.', provider_unavailable:'Não foi possível consultar o provedor agora. Tente novamente.', channel_mismatch:'O canal já vinculado usa outros identificadores; solicite rotação controlada.', reauthentication_required:'Por segurança, saia e entre novamente com o autenticador para realizar esta operação.',
+    invalid_photo:'Escolha uma foto JPEG válida.',
+    clinic_registration_required:'Preencha os dados de identificação, contato e endereço da clínica.',
     activation_unavailable:'O convite está indisponível para este login. Se você já tem conta, entre para aceitar o convite.',
     activation_mfa_invalid:'O código do autenticador é inválido ou expirou. Confira o código atual.',
     permission_denied:'Seu perfil não permite esta operação.', not_found:'Registro indisponível para este acesso.',

@@ -11,14 +11,11 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.fields import unseal
-from backend.infrastructure.models import AuditLog, Membership, PortalSession, Tenant, User
+from backend.infrastructure.models import Membership, PortalSession, Tenant, User
 from backend.infrastructure.portal_models import (
-    AdminNotification,
-    BreakGlassRequest,
     ClinicPolicy,
     IntegrationConfig,
     Message,
-    PlatformAudit,
     PlatformOperator,
     QueueMembership,
     ServiceQueue,
@@ -63,6 +60,9 @@ class PortalHarness:
             )
             assert result.status_code == 200, result.text
         member = "other_member" if role == "other_user" else f"{role}_member"
+        if role == "superadmin":
+            current = self.client.get("/v1/auth/session")
+            assert current.json()["active_membership_id"] == str(self.h.ids[member])
         response = self.client.post(
             "/v1/auth/active-membership",
             json={"membership_id": str(self.h.ids[member])},
@@ -617,66 +617,48 @@ def test_queue_assignment_is_required_even_for_clinic_admin(portal):
     )
 
 
-def test_break_glass_approval_scoped_read_expiry_and_immutable_audit(portal):
+def test_platform_management_is_separate_from_clinic_data(portal):
     p = portal
-    original = p.h.confirm(p.h.hold())
     p.login("superadmin")
-    p.call("GET", f"/v1/appointments/{original['appointment_id']}", expected=403)
-    request = p.call(
-        "POST",
-        "/v1/platform/break-glass",
-        p.command(
-            tenant_id=str(p.h.ids["tenant"]),
-            appointment_id=original["appointment_id"],
-            reason="Investigação técnica sintética autorizada",
-            duration_minutes=5,
-        ),
-        expected=202,
-    ).json()
-    p.call("GET", f"/v1/platform/break-glass/{request['id']}/appointment", expected=403)
+    p.call("GET", "/v1/appointments?" + p.period(), expected=403)
+    p.call("GET", "/v1/inbox", expected=403)
+    p.call("GET", f"/v1/platform/break-glass/{uuid4()}/appointment", expected=404)
+    p.call("POST", "/v1/platform/break-glass", {}, expected=404)
+    users = p.call("GET", "/v1/platform/users?search=reception", expected=200).json()["items"]
+    assert [user["login"] for user in users] == ["reception@test.invalid"]
+    p.call("PATCH", f"/v1/platform/users/{users[0]['id']}", p.command(active=False), expected=200)
+    assert not p.call("GET", "/v1/platform/users?search=reception", expected=200).json()["items"][
+        0
+    ]["active"]
+    p.call("PATCH", f"/v1/platform/users/{users[0]['id']}", p.command(active=True), expected=200)
     p.login()
-    assert (
-        p.call("GET", "/v1/support-requests", expected=200).json()["items"][0]["status"]
-        == "pending"
-    )
-    p.call(
-        "POST",
-        f"/v1/support-requests/{request['id']}/decision",
-        p.command(version=0, decision="approve"),
-        expected=200,
-    )
+    p.call("GET", "/v1/platform/users", expected=403)
+
+
+def test_platform_clinic_registration(portal):
+    p = portal
     p.login("superadmin")
+    body = {"name": "Clínica Teste", "timezone": "America/Fortaleza", "active": True, "version": 0}
+    p.call("POST", "/v1/platform/tenants", p.command(**body), expected=422)
+    registration = {
+        "legal_name": "Clínica Teste Ltda",
+        "document": "12.345.678/0001-90",
+        "responsible_name": "Pessoa Responsável",
+        "email": "contato@test.invalid",
+        "phone": "85999990000",
+        "postal_code": "60000-001",
+        "address": "Rua Teste",
+        "address_number": "100",
+        "neighborhood": "Centro",
+        "city": "Fortaleza",
+        "state": "CE",
+    }
     result = p.call(
-        "GET", f"/v1/platform/break-glass/{request['id']}/appointment", expected=200
+        "POST", "/v1/platform/tenants", p.command(**body, registration=registration), expected=200
     ).json()
-    assert (
-        result["read_only"]
-        and result["appointment"]["id"] == original["appointment_id"]
-        and result["appointment"]["actions"] == []
-    )
-    with Session(p.h.admin) as db, db.begin():
-        db.get(BreakGlassRequest, UUID(request["id"])).expires_at = datetime.now(UTC) - timedelta(
-            seconds=1
-        )
-    p.call("GET", f"/v1/platform/break-glass/{request['id']}/appointment", expected=403)
-    with Session(p.h.admin) as db:
-        assert db.scalar(select(func.count()).select_from(AdminNotification)) == 2
-        assert (
-            db.scalar(
-                select(func.count())
-                .select_from(PlatformAudit)
-                .where(PlatformAudit.action == "breakglass.read")
-            )
-            == 1
-        )
-        assert (
-            db.scalar(
-                select(func.count())
-                .select_from(AuditLog)
-                .where(AuditLog.action == "breakglass.read")
-            )
-            == 1
-        )
+    clinics = p.call("GET", "/v1/platform/tenants", expected=200).json()["items"]
+    row = next(clinic for clinic in clinics if clinic["id"] == result["id"])
+    assert row["registration"]["document"] == registration["document"]
 
 
 def test_platform_operator_registration_is_independent_of_membership_role(portal):
@@ -685,6 +667,35 @@ def test_platform_operator_registration_is_independent_of_membership_role(portal
     with Session(p.h.admin) as db, db.begin():
         db.delete(db.get(PlatformOperator, p.h.ids["superadmin"]))
     p.call("GET", "/v1/platform/tenants", expected=403)
+
+
+def test_profile_details_and_photo_are_private(portal):
+    p = portal
+    p.login("reception")
+    details = {
+        "full_name": "Recepção Teste",
+        "email": "recepcao@test.invalid",
+        "phone": "85999990000",
+    }
+    p.call("PUT", "/v1/auth/profile", details, expected=204)
+    p.call("PUT", "/v1/auth/profile/photo", {"jpeg": "invalid"}, expected=422)
+    p.call("PUT", "/v1/auth/profile/photo", {"jpeg": "/9j//9k="}, expected=204)
+    assert (
+        p.call("GET", "/v1/auth/profile/photo", expected=200).headers["content-type"]
+        == "image/jpeg"
+    )
+    own = p.call("GET", "/v1/auth/profile", expected=200).json()
+    assert own["details"]["full_name"] == details["full_name"] and own["has_photo"]
+    p.login()
+    assert p.call("GET", "/v1/auth/profile", expected=200).json()["details"] is None
+    p.call("GET", "/v1/auth/profile/photo", expected=404)
+    p.login("superadmin")
+    users = p.call("GET", "/v1/platform/users?search=Recepção Teste", expected=200).json()["items"]
+    assert len(users) == 1 and users[0]["details"]["email"] == details["email"]
+    assert "photo" not in users[0]
+    p.login("reception")
+    p.call("PUT", "/v1/auth/profile/photo", {"jpeg": None}, expected=204)
+    p.call("GET", "/v1/auth/profile/photo", expected=404)
 
 
 def test_invitation_requires_recipient_consent_and_does_not_enumerate_accounts(portal):
@@ -754,7 +765,8 @@ def test_invited_user_activates_in_portal_with_mfa(portal, issuer):
     totp = pyotp.TOTP(key)
     bad_code = "000000" if totp.now() != "000000" else "111111"
     password = f"test-{uuid4().hex}"
-    credentials = activation | {"authenticator_key": key, "password": password}
+    profile = {"full_name": "Pessoa Convidada", "email": login, "phone": "(85) 99999-0000"}
+    credentials = activation | {"authenticator_key": key, "password": password, "profile": profile}
     p.call("POST", "/v1/auth/activate", credentials | {"code": bad_code}, expected=422)
     p.call("POST", "/v1/auth/activate", credentials | {"code": totp.now()}, expected=200)
     session = p.call("GET", "/v1/auth/session", expected=200).json()
@@ -764,4 +776,8 @@ def test_invited_user_activates_in_portal_with_mfa(portal, issuer):
     assert [(member["tenant_id"], member["role"]) for member in session["memberships"]] == [
         (str(p.h.ids["tenant"]), role)
     ]
+    assert (
+        p.call("GET", "/v1/auth/profile", expected=200).json()["details"]["full_name"]
+        == profile["full_name"]
+    )
     p.call("POST", setup, activation, expected=409)

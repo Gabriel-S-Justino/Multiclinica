@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import Field, SecretStr, StringConstraints
 
 from backend.application.contracts import Command
+from backend.application.identity_details import PersonalDetails
 
 TextToken = Annotated[str, StringConstraints(min_length=20, max_length=128)]
 
@@ -29,6 +30,11 @@ class CompleteInvitationActivation(InvitationActivation):
     password: SecretStr = Field(min_length=12, max_length=128)
     authenticator_key: SecretStr = Field(min_length=32, max_length=32)
     code: str = Field(pattern=r"^[0-9]{6}$")
+    profile: PersonalDetails
+
+
+class ProfilePhoto(Command):
+    jpeg: str | None = Field(default=None, max_length=60000)
 
 
 class PasswordChange(Command):

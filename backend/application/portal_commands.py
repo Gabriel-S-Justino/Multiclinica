@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 
 from backend.application.contracts import Command
+from backend.application.identity_details import ClinicDetails
 from backend.application.scheduling_commands import Mutation
 from backend.domain.scheduling import utc
 
@@ -238,6 +239,7 @@ class TenantDraft(Versioned):
     name: str = Field(min_length=1, max_length=120)
     timezone: str = Field(min_length=1, max_length=64)
     active: bool
+    registration: ClinicDetails | None = None
 
     @field_validator("timezone")
     @classmethod
@@ -249,11 +251,8 @@ class TenantDraft(Versioned):
         return value
 
 
-class BreakGlassDraft(Mutation):
-    tenant_id: UUID
-    appointment_id: UUID
-    reason: str = Field(min_length=12, max_length=500)
-    duration_minutes: int = Field(ge=1, le=15)
+class PlatformUserStatus(Mutation):
+    active: bool
 
 
 class BreakGlassDecision(Versioned):

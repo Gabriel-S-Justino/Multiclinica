@@ -8,10 +8,18 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from backend.application import auth
+from backend.application.identity_details import PersonalDetails
 from backend.application.portal_access import PortalError, now
 from backend.config import Settings
 from backend.infrastructure.db import set_tenant
-from backend.infrastructure.models import AuditLog, Membership, PortalSession, Tenant, User
+from backend.infrastructure.models import (
+    AuditLog,
+    Membership,
+    PortalSession,
+    Tenant,
+    User,
+    UserProfile,
+)
 from backend.infrastructure.portal_models import Invitation
 from backend.infrastructure.security import PASSWORDS, cipher, digest
 
@@ -54,6 +62,7 @@ def activate_account(
     secret: str,
     totp_code: str,
     correlation_id: UUID,
+    profile: PersonalDetails,
 ) -> tuple[str, str]:
     invitation = activation_invitation(db, settings, login, code)
     moment = now(db)
@@ -83,6 +92,7 @@ def activate_account(
     session_token, csrf = auth.create_session(db, settings, user_id, True)
     db.flush()
     session = auth.get_session(db, settings, session_token)
+    db.add(UserProfile(user_id=user_id, details=profile.model_dump()))
     accept_invitation(db, settings, session, invitation.id, correlation_id)
     return session_token, csrf
 

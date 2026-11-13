@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api } from './api';
 import { pt } from './locales';
+import { ProfileFields, profileFields } from './Profile';
 import { Feedback, Label, Modal, useAction } from './ui';
 
 export function ActivationCode({ code, onClose }: { code: string; onClose: () => void }) {
@@ -26,13 +27,14 @@ export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => 
     event.preventDefault();
     if (mismatch) return;
     const invite = { login, activation_code: activationCode.trim() };
+    const profile = authenticatorKey ? profileFields(event.currentTarget) : undefined;
     void action.run(async () => {
       if (!authenticatorKey) {
         const setup = await api<{ authenticator_key: string }>('/auth/activate/setup', invite);
         setAuthenticatorKey(setup.authenticator_key);
         return;
       }
-      await api('/auth/activate', { ...invite, password, authenticator_key: authenticatorKey, code });
+      await api('/auth/activate', { ...invite, password, authenticator_key: authenticatorKey, code, profile });
       setAuthenticatorKey('');
       setPassword('');
       setConfirmation('');
@@ -46,6 +48,7 @@ export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => 
     <Feedback action={action} />
     <form onSubmit={submit}>
       {authenticatorKey ? <>
+        <ProfileFields email={login.includes('@') ? login.trim() : undefined} />
         <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
           <input readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
         </Label>
