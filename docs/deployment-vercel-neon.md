@@ -1,6 +1,6 @@
 # Deploy e verificação de capacidades
 
-O [portal atual de demonstração](https://multclinicai.vercel.app) e os critérios de operação estão no [roteiro de release](release-runbook.md). A tabela a seguir registra as verificações históricas de design.
+O [portal Multiclinica](https://multclinicai.vercel.app) e os critérios de operação estão no [roteiro de release](release-runbook.md). A tabela a seguir registra as verificações históricas de design.
 
 | Fonte oficial consultada | Evidência e consequência de design |
 |---|---|
