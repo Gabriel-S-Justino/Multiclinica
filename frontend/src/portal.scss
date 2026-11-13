@@ -203,7 +203,6 @@ legend { font-weight: 600; font-size: 13px; padding: 0 6px; }
 .avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--green-100); color: var(--green-800); font-size: 12px; font-weight: 700; }
 .profile-photo { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .profile-photo img { border-radius: 50%; object-fit: cover; }
-.platform-tabs { margin-bottom: 16px; }
 .platform-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));

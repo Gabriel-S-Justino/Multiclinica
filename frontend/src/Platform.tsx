@@ -32,9 +32,12 @@ const clinicFields: Field[] = [
   {name:'active',label:pt.active,group:'Configuração',type:'checkbox',initial:true},
 ];
 
-export function Platform({member,userId}:{member:Membership;userId:string}) {
+export type PlatformSection = 'overview' | 'clinics' | 'users' | 'audit';
+
+export function Platform({member,userId,section,title}:{
+  member:Membership;userId:string;section:PlatformSection;title:string;
+}) {
   const action=useAction(member);
-  const [tab,setTab]=useState<'overview'|'clinics'|'users'|'audit'>('overview');
   const [editing,setEditing]=useState<Clinic|RecordData|null>(null);
   const [invite,setInvite]=useState<Clinic|null>(null);
   const [invitingSuperadmin,setInvitingSuperadmin]=useState(false);
@@ -44,8 +47,8 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
   const [search,setSearch]=useState('');
   const [selected,setSelected]=useState<PlatformUser|null>(null);
   const [permissionsClinic,setPermissionsClinic]=useState<Clinic|null>(null);
-  const tenants=useRemote<Page<Clinic>>(member,tab==='clinics'?`/platform/tenants?limit=50&cursor=${encodeURIComponent(clinicCursor)}`:null);
-  const users=useRemote<Page<PlatformUser>>(member,tab==='users'?`/platform/users?limit=50&search=${encodeURIComponent(search)}&cursor=${encodeURIComponent(userCursor)}`:null);
+  const tenants=useRemote<Page<Clinic>>(member,section==='clinics'?`/platform/tenants?limit=50&cursor=${encodeURIComponent(clinicCursor)}`:null);
+  const users=useRemote<Page<PlatformUser>>(member,section==='users'?`/platform/users?limit=50&search=${encodeURIComponent(search)}&cursor=${encodeURIComponent(userCursor)}`:null);
 
   function saveClinic(values:RecordData) {
     const {name,timezone,active,version,...registration}=values;
@@ -57,20 +60,14 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
   }
 
   return <>
-    <PageHeader title="Administração da plataforma">
-      {tab==='clinics'&&<button onClick={()=>{action.clearError();setEditing({});}}><Icon name="plus" size={16}/>{pt.newClinic}</button>}
-      {tab==='users'&&<button onClick={()=>{action.clearError();setInvitingSuperadmin(true);}}><Icon name="plus" size={16}/>Cadastrar Superadmin</button>}
+    <PageHeader title={title}>
+      {section==='clinics'&&<button onClick={()=>{action.clearError();setEditing({});}}><Icon name="plus" size={16}/>{pt.newClinic}</button>}
+      {section==='users'&&<button onClick={()=>{action.clearError();setInvitingSuperadmin(true);}}><Icon name="plus" size={16}/>Cadastrar Superadmin</button>}
     </PageHeader>
-    <div className="form-actions platform-tabs">
-      <button className={tab==='overview'?'':'secondary'} aria-pressed={tab==='overview'} onClick={()=>setTab('overview')}>Visão geral</button>
-      <button className={tab==='clinics'?'':'secondary'} aria-pressed={tab==='clinics'} onClick={()=>setTab('clinics')}>Clínicas</button>
-      <button className={tab==='users'?'':'secondary'} aria-pressed={tab==='users'} onClick={()=>setTab('users')}>Usuários</button>
-      <button className={tab==='audit'?'':'secondary'} aria-pressed={tab==='audit'} onClick={()=>setTab('audit')}>Auditoria</button>
-    </div>
     <Feedback action={action}/>
-    {tab==='overview'&&<PlatformOverview member={member}/>}
-    {tab==='audit'&&<PlatformAuditReport member={member}/>}
-    {tab==='clinics' && <>
+    {section==='overview'&&<PlatformOverview member={member}/>}
+    {section==='audit'&&<PlatformAuditReport member={member}/>}
+    {section==='clinics' && <>
       {tenants.isPending?<Loading/>:tenants.isError?<Failure error={tenants.error}/>:!tenants.data.items.length?<Empty icon="building"/>:
         <div className="record-list">{tenants.data.items.map(clinic=><article className="record-card" key={clinic.id}>
           <div className="record-main"><div className="record-title"><h2>{clinic.name}</h2><span className={`badge ${clinic.active?'active':'inactive'}`}>{clinic.active?pt.active:pt.inactive}</span></div>
@@ -85,7 +82,7 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
         </article>)}</div>}
       <div className="form-actions">{clinicCursor&&<button className="secondary" onClick={()=>setClinicCursor('')}>Primeira página</button>}
       {tenants.data?.next_cursor&&<button className="secondary" onClick={()=>setClinicCursor(tenants.data.next_cursor??'')}>Próxima página</button>}</div>
-    </>}{tab==='users'&&<>
+    </>}{section==='users'&&<>
       <Label text="Buscar por nome ou login"><input type="search" maxLength={254} value={search} onChange={event=>{setSearch(event.target.value);setUserCursor('');}}/></Label>
       {users.isPending?<Loading/>:users.isError?<Failure error={users.error}/>:!users.data.items.length?<Empty icon="user"/>:
         <div className="record-list">{users.data.items.map(user=><article className="record-card" key={user.id}>
@@ -113,7 +110,7 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
         setCode(result.activation_code);
       },pt.invitationRequested)}/>}
     {code&&<ActivationCode code={code} onClose={()=>setCode('')}
-      hint={tab==='users'?'Compartilhe o código em particular com o destinatário. Ele poderá ativar a conta na tela de login em até 24 horas.':undefined}/>}
+      hint={section==='users'?'Compartilhe o código em particular com o destinatário. Ele poderá ativar a conta na tela de login em até 24 horas.':undefined}/>}
     {permissionsClinic&&<ClinicPermissions clinic={permissionsClinic} member={member} onClose={()=>setPermissionsClinic(null)}/>}
     {selected&&<UserRecord user={selected} busy={action.busy} action={action} onClose={()=>setSelected(null)}
       onDelete={selected.id===userId?undefined:()=>void action.run(async()=>{await action.send(`/platform/users/${selected.id}`,{},'DELETE');setSelected(null);},'Usuário excluído.')}

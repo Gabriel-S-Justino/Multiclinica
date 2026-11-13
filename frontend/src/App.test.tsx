@@ -1,10 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { MemoryRouter } from 'react-router-dom';
 
-function mount() {return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><App /></MemoryRouter></QueryClientProvider>);}
+function mount(path = '/') {return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[path]}><App /></MemoryRouter></QueryClientProvider>);}
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 test('exibe login acessível e falha sem revelar a resposta do servidor', async () => {
@@ -29,4 +29,24 @@ test('oculta rotas administrativas quando o servidor não concede a capacidade',
   mount();
   expect(await screen.findByRole('heading',{name:'Este acesso não está disponível para o seu perfil.'})).toBeInTheDocument();
   expect(screen.queryByRole('link',{name:'Serviços'})).not.toBeInTheDocument();
+});
+
+test('abre as seções da plataforma pelo menu lateral do Superadmin', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(
+    url.endsWith('/auth/session')
+      ? {user_id:'u', active_membership_id:null, memberships:[], platform_access:true}
+      : {items:[]}
+  ))));
+  mount('/clinics');
+  const sidebar = await screen.findByRole('navigation', {name:'Administração da plataforma'});
+  await screen.findByRole('heading', {name:'Visão geral', level:1});
+  for (const section of ['Clínicas', 'Usuários', 'Auditoria']) {
+    const link = within(sidebar).getByRole('link', {name:section});
+    fireEvent.click(link);
+    expect(await screen.findByRole('heading', {name:section, level:1})).toBeInTheDocument();
+    expect(link).toHaveAttribute('aria-current', 'page');
+    if (section === 'Usuários') {
+      expect(screen.getByRole('button', {name:'Cadastrar Superadmin'})).toBeInTheDocument();
+    }
+  }
 });

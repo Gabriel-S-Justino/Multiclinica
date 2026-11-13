@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { AccountActivation } from './AccountActivation';
 import { Agenda } from './Agenda';
 import { Audit, IntegrationPage, Schedules, Services, Settings, SupportReviews, Team } from './Management';
 import { InboxPage } from './InboxPage';
-import { Platform } from './Platform';
+import { Platform, type PlatformSection } from './Platform';
 import { Profile } from './Profile';
 import { pt } from './locales';
 import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, useAction, useRemote, type IconName } from './ui';
@@ -115,37 +115,54 @@ const navigation:{path:string;title:string;icon:IconName;cap:string}[]=[
   {path:'/schedules',title:pt.schedules,icon:'clock',cap:'agenda.read'},{path:'/services',title:pt.services,icon:'services',cap:'services.manage'},
   {path:'/team',title:pt.team,icon:'team',cap:'team.manage'},{path:'/settings',title:pt.settings,icon:'settings',cap:'settings.manage'},
   {path:'/integrations',title:pt.integrations,icon:'plug',cap:'integrations.manage'},{path:'/audit',title:pt.audit,icon:'audit',cap:'audit.read'},
-  {path:'/support',title:pt.supportRequests,icon:'shield',cap:'support.review'},{path:'/clinics',title:pt.platform,icon:'building',cap:'platform.manage'}];
+  {path:'/support',title:pt.supportRequests,icon:'shield',cap:'support.review'}];
+
+const platformHome = '/admin';
+const platformTitle = 'Administração da plataforma';
+const platformNavigation = [
+  {path:platformHome, section:'overview', title:'Visão geral', icon:'services'},
+  {path:'/admin/clinics', section:'clinics', title:'Clínicas', icon:'building'},
+  {path:'/admin/users', section:'users', title:'Usuários', icon:'team'},
+  {path:'/admin/audit', section:'audit', title:pt.audit, icon:'audit'},
+] as const satisfies ReadonlyArray<{path:string;section:PlatformSection;title:string;icon:IconName}>;
+
+const platformMember: Membership = {id:'platform',tenant_id:'',role:'superadmin',capabilities:['platform.manage']};
 
 function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching,onAccepted}: {session:Session;member?:Membership;onSwitch:(id:string)=>Promise<void>;onLogout:()=>Promise<void>;onPasswordChanged:()=>Promise<unknown>;switching:boolean;onAccepted:()=>Promise<unknown>}) {
   const location=useLocation();
-  const inPlatform=Boolean(session.platform_access && (location.pathname==='/clinics' || !member));
-  const workspaceMember: Membership|undefined=inPlatform
-    ? {id:'platform',tenant_id:'',role:'superadmin',capabilities:['platform.manage']}
-    : member;
+  const platformPath=useMatch('/admin/*');
+  const legacyPlatformPath=useMatch('/clinics');
+  const inPlatform=Boolean(session.platform_access && (platformPath || legacyPlatformPath || !member));
+  const workspaceMember=inPlatform?platformMember:member;
   const [accountOpen,setAccountOpen]=useState<'profile'|'password'|null>(null);
   const [menuOpen,setMenuOpen]=useState(false);
   useEffect(()=>{setMenuOpen(false);document.getElementById('page-title')?.focus({preventScroll:false});},[location.pathname]);
   useEffect(()=>{if(!menuOpen)return;function escape(event:KeyboardEvent){if(event.key==='Escape')setMenuOpen(false);}window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[menuOpen]);
-  const home=inPlatform?'/clinics':'/agenda';
   const role=pt.roles[workspaceMember?.role??'']??(session.memberships.length===1?pt.roles[session.memberships[0].role]:pt.subtitle);
   return <><div className={menuOpen?'workspace menu-open':'workspace'}><a className="skip-link" href="#workspace-content" onClick={event=>{event.preventDefault();document.getElementById('workspace-content')?.focus();}}>{pt.skip}</a>
     <aside className="sidebar" id="workspace-menu" aria-label={pt.menu}><div className="sidebar-head"><div className="brand-lockup"><span className="brand" aria-hidden="true"><Icon name="plus" size={20}/></span><strong>{pt.title}</strong></div><button type="button" className="icon-button ghost menu-close" aria-label={pt.closeMenu} onClick={()=>setMenuOpen(false)}><Icon name="close"/></button></div>
     {session.memberships.length>0&&<div className="clinic-select"><Label text={pt.choose}><select aria-label={pt.choose} value={inPlatform?'':session.active_membership_id??''} disabled={switching} onChange={event=>{if(event.target.value)void onSwitch(event.target.value);}}><option value="">{pt.choose}</option>{session.memberships.map((item,index)=><option key={item.id} value={item.id}>{item.clinic_name??`${pt.clinic} ${index+1}`}</option>)}</select></Label></div>}
-    <nav aria-label={pt.workspace}>{navigation.filter(item=>workspaceMember?.capabilities?.includes(item.cap)||item.path==='/clinics'&&session.platform_access).map(item=><NavLink to={item.path} key={item.path}><Icon name={item.icon}/>{item.path==='/clinics'?'Administração da plataforma':item.title}</NavLink>)}</nav>
+    {inPlatform?<nav aria-label={platformTitle}>
+      {platformNavigation.map(item=><NavLink end to={item.path} key={item.path}><Icon name={item.icon}/>{item.title}</NavLink>)}
+    </nav>:<nav aria-label={pt.workspace}>
+      {navigation.filter(item=>member?.capabilities?.includes(item.cap)).map(item=><NavLink to={item.path} key={item.path}><Icon name={item.icon}/>{item.title}</NavLink>)}
+      {session.platform_access&&<NavLink to={platformHome}><Icon name="building"/>{platformTitle}</NavLink>}
+    </nav>}
     {!inPlatform&&member?.capabilities?.includes('agenda.read')&&<Roster member={member}/>}
   </aside><div className="sidebar-backdrop" aria-hidden="true" onClick={()=>setMenuOpen(false)}/>
   <div className="workspace-main"><header className="topbar">
       <button type="button" className="icon-button ghost menu-toggle" aria-label={pt.openMenu} aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={()=>setMenuOpen(true)}><Icon name="menu"/></button>
-      <div className="topbar-context"><strong>{inPlatform?'Administração da plataforma':member?.clinic_name??pt.title}</strong>{!inPlatform&&member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{member.timezone}</span>}</div>
+      <div className="topbar-context"><strong>{inPlatform?platformTitle:member?.clinic_name??pt.title}</strong>{!inPlatform&&member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{member.timezone}</span>}</div>
       <div className="account">
         <button type="button" className="ghost account-button" onClick={()=>setAccountOpen('profile')}><Icon name="user" size={16}/><span>{pt.myAccount}</span></button>
         <button type="button" className="ghost account-button" onClick={()=>void onLogout()}><Icon name="logout" size={16}/><span>{pt.logout}</span></button></div>
     </header>
     <main id="workspace-content" tabIndex={-1}>{!inPlatform&&<Invitations onAccepted={onAccepted}/>}
-    {switching?<Loading/>:inPlatform&&workspaceMember?<Routes>
-      <Route path="/clinics" element={<Platform member={workspaceMember} userId={session.user_id}/>}/>
-      <Route path="*" element={<Navigate to={home} replace/>}/>
+    {switching?<Loading/>:inPlatform?<Routes>
+      {platformNavigation.map(item=><Route key={item.path} path={item.path} element={
+        <Platform key={item.section} section={item.section} title={item.title} member={platformMember} userId={session.user_id}/>
+      }/>)}
+      <Route path="*" element={<Navigate to={platformHome} replace/>}/>
     </Routes>:!member?<><PageHeader title={pt.choose}/><Empty icon="building">{pt.selectClinic}</Empty></>:<Routes>
       <Route path="/agenda" element={<Allowed member={member} capability="agenda.read"><Agenda member={member}/></Allowed>}/>
       <Route path="/services" element={<Allowed member={member} capability="services.manage"><Services member={member}/></Allowed>}/>
@@ -156,7 +173,7 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
       <Route path="/integrations" element={<Allowed member={member} capability="integrations.manage"><IntegrationPage member={member}/></Allowed>}/>
       <Route path="/audit" element={<Allowed member={member} capability="audit.read"><Audit member={member}/></Allowed>}/>
       <Route path="/support" element={<Allowed member={member} capability="support.review"><SupportReviews member={member}/></Allowed>}/>
-      <Route path="*" element={<Navigate to={home} replace/>}/>
+      <Route path="*" element={<Navigate to="/agenda" replace/>}/>
     </Routes>}</main></div></div>
     {accountOpen==='profile'&&<Profile role={role} onClose={()=>setAccountOpen(null)} onPassword={()=>setAccountOpen('password')}/>}
     {accountOpen==='password'&&<AccountPassword onClose={()=>setAccountOpen('profile')} onChanged={onPasswordChanged}/>}
@@ -175,11 +192,11 @@ export function App() {
     setPasswordChanged(false);
     client.clear();
     const result=await refetch();
-    if(result.data?.platform_access) navigate('/clinics',{replace:true});
+    if(result.data?.platform_access) navigate(platformHome,{replace:true});
     return result;
   }
   async function passwordChangedSuccessfully(){setPasswordChanged(true);client.clear();return refetch();}
-  async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});const result=await refetch();const member=result.data?.memberships.find(item=>item.id===id);navigate(member?.capabilities?.includes('platform.manage')?'/clinics':'/agenda',{replace:true});});setSwitching(false);}
+  async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});const result=await refetch();const member=result.data?.memberships.find(item=>item.id===id);navigate(member?.capabilities?.includes('platform.manage')?platformHome:'/agenda',{replace:true});});setSwitching(false);}
   async function logout(){await action.run(async()=>{await api('/auth/logout',{});client.clear();await refetch();});}
   if(session.isPending)return <main className="startup"><Loading/></main>;
   if(session.isError){if(unauthenticated)return <Login onAuthenticated={authenticated} info={passwordChanged?pt.passwordChanged:undefined}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}><Icon name="refresh" size={16}/>{pt.refresh}</button></main>;}
