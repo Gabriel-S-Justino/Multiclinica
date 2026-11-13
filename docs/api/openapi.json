@@ -111,6 +111,90 @@
         }
       }
     },
+    "/v1/auth/activate/setup": {
+      "post": {
+        "summary": "Activation Setup",
+        "operationId": "activation_setup_v1_auth_activate_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationActivation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Activation Setup V1 Auth Activate Setup Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/activate": {
+      "post": {
+        "summary": "Activation Complete",
+        "operationId": "activation_complete_v1_auth_activate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteInvitationActivation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Activation Complete V1 Auth Activate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/session": {
       "get": {
         "summary": "Session Info",
@@ -4198,6 +4282,52 @@
         ],
         "title": "ClinicPolicyDraft"
       },
+      "CompleteInvitationActivation": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Login"
+          },
+          "activation_code": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[0-9a-f]{64}$",
+            "title": "Activation Code"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 12,
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          },
+          "authenticator_key": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 32,
+            "format": "password",
+            "title": "Authenticator Key",
+            "writeOnly": true
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "login",
+          "activation_code",
+          "password",
+          "authenticator_key",
+          "code"
+        ],
+        "title": "CompleteInvitationActivation"
+      },
       "ConfirmRequest": {
         "properties": {
           "idempotency_key": {
@@ -4714,6 +4844,28 @@
           "items"
         ],
         "title": "IntegrationsView"
+      },
+      "InvitationActivation": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Login"
+          },
+          "activation_code": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[0-9a-f]{64}$",
+            "title": "Activation Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "login",
+          "activation_code"
+        ],
+        "title": "InvitationActivation"
       },
       "InvitationDraft": {
         "properties": {

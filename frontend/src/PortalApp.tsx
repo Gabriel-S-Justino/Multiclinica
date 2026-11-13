@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
+import { AccountActivation } from './AccountActivation';
 import { Agenda } from './Agenda';
 import { Audit, IntegrationPage, Schedules, Services, Settings, SupportReviews, Team } from './Management';
 import { InboxPage } from './InboxPage';
@@ -13,7 +14,7 @@ import type { Membership, Page, Professional, Session } from './types';
 function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;info?:string}) {
   const [challenge,setChallenge]=useState<string>();
   const [login,setLogin]=useState('');const [password,setPassword]=useState('');const [code,setCode]=useState('');
-  const [mode,setMode]=useState<'login'|'recover'|'change'>('login');
+  const [mode,setMode]=useState<'login'|'recover'|'change'|'activate'>('login');
   const [token,setToken]=useState('');const [replacement,setReplacement]=useState('');
   const [confirmation,setConfirmation]=useState('');
   const action=useAction();
@@ -27,8 +28,8 @@ function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;inf
   const reveal=<button type="button" className="text-button reveal-toggle" aria-pressed={showPassword} onClick={()=>setShowPassword(value=>!value)}><Icon name={showPassword?'eyeOff':'eye'} size={16}/>{pt.showPasswords}</button>;
   return <div className="auth-layout"><section className="auth-story" aria-label={pt.title}><div className="brand-lockup"><span className="brand" aria-hidden="true"><Icon name="plus" size={20}/></span><strong>{pt.title}</strong></div><div className="auth-story-copy"><h1>{pt.foundation}</h1>
       <ul className="auth-features">{pt.loginFeatures.map((item,index)=><li key={item}><span aria-hidden="true"><Icon name={(['calendar','chat','shield'] as const)[index]} size={18}/></span>{item}</li>)}</ul></div><p className="auth-footnote"><Icon name="lock" size={14}/>{pt.mfaNotice}</p></section>
-    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2 className="auth-title">{mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>{info&&<p role="status" className="feedback success">{info}</p>}
-      <form onSubmit={event=>{event.preventDefault();void action.run(async()=>{
+    <main className="auth-panel"><div className="auth-form"><p className="eyebrow">{pt.subtitle}</p><h2 className="auth-title">{mode==='activate'?pt.activateAccount:mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</h2><Feedback action={action}/>{info&&<p role="status" className="feedback success">{info}</p>}
+      {mode==='activate'?<AccountActivation onAuthenticated={onAuthenticated}/>:<form onSubmit={event=>{event.preventDefault();void action.run(async()=>{
         if(mode==='recover'){
           await api('/auth/recovery/confirm',{token,password:replacement});backToLogin();return;
         }
@@ -61,12 +62,13 @@ function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;inf
           {reveal}
         </>}
         <button className="full" disabled={action.busy||mismatch}>{action.busy?pt.loading:mode==='change'?pt.changeOwnPassword:mode==='recover'?pt.resetPassword:challenge?pt.verify:pt.signIn}</button>
-      </form>
+      </form>}
       {challenge||mode!=='login'?<div className="auth-help"><button className="text-button" type="button" onClick={backToLogin}><Icon name="left" size={16}/>{pt.backLogin}</button></div>
         :<div className="auth-help">
           <p className="muted">{pt.forgotPassword}</p>
           <div className="auth-links"><button className="text-button" type="button" disabled={action.busy||!login} onClick={()=>void action.run(()=>api('/auth/recovery/request',{login}),pt.recoveryInfo)}>{pt.recovery}</button>
-          <button className="text-button" type="button" onClick={()=>setMode('recover')}>{pt.haveRecovery}</button></div>
+          <button className="text-button" type="button" onClick={()=>setMode('recover')}>{pt.haveRecovery}</button>
+          <button className="text-button" type="button" onClick={()=>{action.clearError();setMode('activate');}}>{pt.activateAccount}</button></div>
           {!login&&<small className="field-hint">{pt.recoveryNeedsLogin}</small>}
         </div>}
     </div></main></div>;

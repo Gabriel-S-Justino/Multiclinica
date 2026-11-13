@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { ActivationCode } from './AccountActivation';
 import { api } from './api';
 import { pt } from './locales';
 import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, formatInstant, formatLongDay, isoToZoned, minutes, useAction, useRemote, zonedToIso } from './ui';
@@ -93,9 +94,17 @@ export function Team({member}: {member:Membership}) {
   const [editProfessional,setProfessional] = useState<RecordData|null>(null);
   const [editMember,setMember] = useState<RecordData|null>(null);
   const [invite,setInvite] = useState(false);
+  const [activationCode, setActivationCode] = useState('');
   const roles = Object.entries(pt.roles).filter(([key])=>key!=='superadmin').map(([value,label])=>({value,label}));
   return <><PageHeader title={pt.team} description={pt.teamDescription}><button className="secondary" onClick={()=>{action.clearError();setInvite(true);}}>{pt.invite}</button><button onClick={()=>{action.clearError();setProfessional({});}}><Icon name="plus" size={16}/>{pt.newProfessional}</button></PageHeader><Feedback action={action}/>
-    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<p className="note">{pt.inviteHint}</p>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:roles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{const {version:ignored,...payload}=values;void ignored;await action.send('/team/invitations',payload);setInvite(false);},pt.invitationRequested)}/>}
+    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<p className="note">{pt.inviteHint}</p>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:roles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{
+      const {version:ignored,...payload}=values;
+      void ignored;
+      const receipt=await action.send<{activation_code:string}>('/team/invitations',payload);
+      setInvite(false);
+      setActivationCode(receipt.activation_code);
+    },pt.invitationRequested)}/>}
+    {activationCode && <ActivationCode code={activationCode} onClose={()=>setActivationCode('')}/>}
     {editProfessional && <Editor key={String(editProfessional.id??'new')} title={editProfessional.id?`${pt.edit}: ${String(editProfessional.display_name)}`:pt.newProfessional} initial={editProfessional} busy={action.busy} action={action} fields={[
       {name:'display_name',label:pt.name},{name:'active',label:pt.active,type:'checkbox'},
       {name:'user_id',label:pt.portalAccount,type:'select',optional:true,options:members.data?.items.map(item=>({value:String(item.user_id),label:String(item.login)}))},

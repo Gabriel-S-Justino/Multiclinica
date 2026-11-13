@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID, uuid4
 
+import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -15,7 +16,7 @@ from sqlalchemy import Engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.application import auth, portal
+from backend.application import auth, invitations, portal
 from backend.application.portal_access import PortalError
 from backend.application.portal_session import capabilities
 from backend.config import Settings
@@ -28,6 +29,8 @@ from backend.infrastructure.security import digest
 from backend.presentation.portal_routes import register_portal_routes
 from backend.presentation.schemas import (
     AuthenticatedPasswordChange,
+    CompleteInvitationActivation,
+    InvitationActivation,
     Login,
     PasswordChange,
     RecoveryConfirm,
@@ -290,6 +293,41 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         login_origin(request)
         throttle(request, "mfa", command.challenge)
         raw, csrf = auth.verify_mfa(db, settings, command.challenge, command.code)
+        cookies(response, raw, csrf)
+        return {"status": "authenticated"}
+
+    @app.post("/v1/auth/activate/setup")
+    def activation_setup(
+        command: InvitationActivation,
+        request: Request,
+        db: Session = Depends(db_session, scope="function"),
+    ) -> dict[str, str]:
+        login_origin(request)
+        login_name = command.login.strip().lower()
+        throttle(request, "activation-setup", login_name)
+        invitations.activation_invitation(db, settings, login_name, command.activation_code)
+        return {"authenticator_key": pyotp.random_base32()}
+
+    @app.post("/v1/auth/activate")
+    def activation_complete(
+        command: CompleteInvitationActivation,
+        request: Request,
+        response: Response,
+        db: Session = Depends(db_session, scope="function"),
+    ) -> dict[str, str]:
+        login_origin(request)
+        login_name = command.login.strip().lower()
+        throttle(request, "activation-complete", login_name)
+        raw, csrf = invitations.activate_account(
+            db,
+            settings,
+            login_name,
+            command.activation_code,
+            command.password.get_secret_value(),
+            command.authenticator_key.get_secret_value(),
+            command.code,
+            UUID(request.state.correlation_id),
+        )
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
 

@@ -48,7 +48,7 @@ def login(
         user.password_hash = PASSWORDS.hash(password)
     if settings.mfa_required or user.mfa_secret:
         if not user.mfa_secret:
-            # Enrollment is an operator-controlled command, never a password-only bypass.
+            # Enrollment must complete before password-based sign-in.
             raise AuthError
         challenge = token()
         db.add(

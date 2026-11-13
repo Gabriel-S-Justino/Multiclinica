@@ -4,14 +4,14 @@ O portal local usa React/TypeScript, React Router, TanStack Query e SCSS. A API 
 
 ## Operação
 
-1. Provisionar contas com `python -m backend.manage --help`. O bootstrap administrativo e o de plataforma exigem MFA; os segredos são informados pelo terminal, sem eco.
+1. Para o primeiro acesso administrativo, executar o bootstrap pelo terminal. Para as demais contas, criar um convite pelo portal e compartilhar o código de ativação em particular com o destinatário.
 2. Entrar, validar o autenticador e selecionar a clínica. Os menus dependem das capacidades retornadas pelo servidor; a autorização é repetida em cada operação.
 3. Configurar unidades, profissionais, habilitações, serviços, horários e políticas aprovadas pela clínica. Serviços sem validação não oferecem agendamento.
 4. Na agenda, cadastrar o contato e o paciente mínimo, selecionar horário, revisar o hold e confirmar. Uma reserva temporária não equivale a consulta confirmada.
 5. Verificar vínculos conforme procedimento aprovado antes das operações que exigem identidade. A referência registrada não deve conter dados pessoais.
 6. Atribuir membros às filas. No atendimento humano, assumir a conversa antes de responder. Respostas ficam cifradas e enfileiradas; envio WhatsApp será implementado na F5.
 
-Convites são aceitos pelo destinatário autenticado. Não há envio de e-mail nem criação silenciosa de contas. Credenciais de integrações são somente de escrita; salvar não verifica o provedor.
+Quem já tem conta aceita o convite após entrar. Para uma conta nova, o destinatário abre **Ativar conta** na tela de login, informa seu login e o código do convite, configura o autenticador e escolhe a senha. A ativação cria a conta e aceita o convite na mesma transação. O código vale por sete dias e é compartilhado pelo administrador. Credenciais de integrações são somente de escrita; salvar não verifica o provedor.
 
 O operador de plataforma precisa de registro adicional e MFA. Acesso excepcional exige aprovação de outro administrador da clínica, expira em até 15 minutos e permite ler somente a consulta especificada, com auditoria e notificação. Não concede edição clínica.
 

@@ -702,9 +702,11 @@ def test_invitation_requires_recipient_consent_and_does_not_enumerate_accounts(p
         p.command(login="not-provisioned@test.invalid", role="collaborator"),
         expected=202,
     ).json()
-    assert {key: value for key, value in known.items() if key != "id"} == {
-        key: value for key, value in unknown.items() if key != "id"
+    assert known.keys() == unknown.keys()
+    assert {key: value for key, value in known.items() if key not in {"id", "activation_code"}} == {
+        key: value for key, value in unknown.items() if key not in {"id", "activation_code"}
     }
+    assert len(known["activation_code"]) == len(unknown["activation_code"])
     with Session(p.h.admin) as db:
         assert (
             db.scalar(
@@ -728,3 +730,38 @@ def test_invitation_requires_recipient_consent_and_does_not_enumerate_accounts(p
     )
     session = p.call("GET", "/v1/auth/session", expected=200).json()
     assert result["membership_id"] in {member["id"] for member in session["memberships"]}
+
+
+@pytest.mark.parametrize("issuer", ["admin", "superadmin"])
+def test_invited_user_activates_in_portal_with_mfa(portal, issuer):
+    p = portal
+    p.login(issuer)
+    login = "new-user@test.invalid"
+    role = "reception" if issuer == "admin" else "admin"
+    path = (
+        "/v1/team/invitations"
+        if issuer == "admin"
+        else f"/v1/platform/tenants/{p.h.ids['tenant']}/administrators"
+    )
+    command = p.command(login=login, role=role)
+    invitation = p.call("POST", path, command, expected=202).json()
+    assert p.call("POST", path, command, expected=202).json() == invitation
+    p.client.cookies.clear()
+    activation = {"login": login, "activation_code": invitation["activation_code"]}
+    setup = "/v1/auth/activate/setup"
+    p.call("POST", setup, activation | {"login": "other@test.invalid"}, expected=409)
+    key = p.call("POST", setup, activation, expected=200).json()["authenticator_key"]
+    totp = pyotp.TOTP(key)
+    bad_code = "000000" if totp.now() != "000000" else "111111"
+    password = f"test-{uuid4().hex}"
+    credentials = activation | {"authenticator_key": key, "password": password}
+    p.call("POST", "/v1/auth/activate", credentials | {"code": bad_code}, expected=422)
+    p.call("POST", "/v1/auth/activate", credentials | {"code": totp.now()}, expected=200)
+    session = p.call("GET", "/v1/auth/session", expected=200).json()
+    with Session(p.h.admin) as db:
+        user = db.get(User, UUID(session["user_id"]))
+        assert user is not None and user.login == login
+    assert [(member["tenant_id"], member["role"]) for member in session["memberships"]] == [
+        (str(p.h.ids["tenant"]), role)
+    ]
+    p.call("POST", setup, activation, expected=409)

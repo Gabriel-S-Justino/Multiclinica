@@ -18,6 +18,19 @@ class VerifyMFA(Command):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class InvitationActivation(Command):
+    login: str = Field(min_length=3, max_length=254)
+    activation_code: str = Field(
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[0-9a-f]{64}$"
+    )
+
+
+class CompleteInvitationActivation(InvitationActivation):
+    password: SecretStr = Field(min_length=12, max_length=128)
+    authenticator_key: SecretStr = Field(min_length=32, max_length=32)
+    code: str = Field(pattern=r"^[0-9]{6}$")
+
+
 class PasswordChange(Command):
     login: str = Field(min_length=3, max_length=254)
     current_password: SecretStr = Field(min_length=1, max_length=128)

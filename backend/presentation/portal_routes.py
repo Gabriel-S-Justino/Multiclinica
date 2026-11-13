@@ -150,7 +150,7 @@ def register_portal_routes(
         command: InvitationDraft, request: Request, ctx: PortalContext = Depends(context)
     ) -> dict[str, Any]:
         keyed(request, command)
-        return ClinicAdmin(ctx).invite(command)
+        return invitations.activation_receipt(settings, ClinicAdmin(ctx).invite(command))
 
     @app.get("/v1/auth/invitations")
     def invitations_for_user(
@@ -583,7 +583,9 @@ def register_portal_routes(
         ctx: PortalContext = Depends(context),
     ) -> dict[str, Any]:
         keyed(request, command)
-        return PlatformAdmin(ctx).invite_administrator(command, tenant_id)
+        return invitations.activation_receipt(
+            settings, PlatformAdmin(ctx).invite_administrator(command, tenant_id)
+        )
 
     @app.get("/v1/platform/break-glass")
     def my_access_requests(ctx: PortalContext = Depends(context)) -> dict[str, Any]:
