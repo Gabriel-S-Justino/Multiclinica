@@ -20,7 +20,12 @@ from backend.infrastructure.models import (
     User,
     UserProfile,
 )
-from backend.infrastructure.portal_models import Invitation
+from backend.infrastructure.portal_models import (
+    Invitation,
+    PlatformAudit,
+    PlatformInvitation,
+    PlatformOperator,
+)
 from backend.infrastructure.security import PASSWORDS, cipher, digest
 
 
@@ -30,13 +35,49 @@ def activation_receipt(settings: Settings, receipt: dict[str, Any]) -> dict[str,
     return {**receipt, "activation_code": f"{invitation_id}.{signature}"}
 
 
-def activation_invitation(db: Session, settings: Settings, login: str, code: str) -> Invitation:
+def platform_activation_code(settings: Settings, invitation_id: UUID) -> str:
+    signature = digest(settings, "platform-invitation-activation", str(invitation_id))
+    return f"{invitation_id}.{signature}"
+
+
+def activation_invitation(
+    db: Session, settings: Settings, login: str, code: str
+) -> Invitation | PlatformInvitation:
     raw_id, _, signature = code.partition(".")
-    if not hmac.compare_digest(digest(settings, "invitation-activation", raw_id), signature):
+    platform = hmac.compare_digest(
+        digest(settings, "platform-invitation-activation", raw_id), signature
+    )
+    if not platform and not hmac.compare_digest(
+        digest(settings, "invitation-activation", raw_id), signature
+    ):
         raise PortalError("activation_unavailable", 409)
 
     recipient = digest(settings, "invite-recipient", login)
     db.execute(text("SELECT set_config('app.invite_recipient',:value,true)"), {"value": recipient})
+    if db.scalar(select(User.id).where(User.login == login)) is not None:
+        raise PortalError("activation_unavailable", 409)
+    if platform:
+        db.execute(
+            text("SELECT set_config('app.platform_invite_proof',:value,true)"),
+            {"value": digest(settings, "platform-invitation-proof", code)},
+        )
+        platform_invite = db.scalar(
+            select(PlatformInvitation)
+            .join(PlatformOperator, PlatformOperator.user_id == PlatformInvitation.issuer_id)
+            .join(User, User.id == PlatformInvitation.issuer_id)
+            .where(
+                PlatformInvitation.id == UUID(raw_id),
+                PlatformInvitation.accepted_at.is_(None),
+                PlatformInvitation.expires_at > now(db),
+                PlatformOperator.active.is_(True),
+                User.active.is_(True),
+                User.deleted_at.is_(None),
+            )
+        )
+        if platform_invite is None:
+            raise PortalError("activation_unavailable", 409)
+        return platform_invite
+
     invitation = db.scalar(
         select(Invitation)
         .join(Tenant, Tenant.id == Invitation.tenant_id)
@@ -48,7 +89,7 @@ def activation_invitation(db: Session, settings: Settings, login: str, code: str
             Tenant.active.is_(True),
         )
     )
-    if invitation is None or db.scalar(select(User.id).where(User.login == login)) is not None:
+    if invitation is None:
         raise PortalError("activation_unavailable", 409)
     return invitation
 
@@ -71,12 +112,19 @@ def activate_account(
     ):
         raise PortalError("activation_mfa_invalid", 422)
 
-    set_tenant(db, invitation.tenant_id)
-    db.execute(text("SELECT public.lock_schedule(:tenant)"), {"tenant": invitation.tenant_id})
-    user_id = db.scalar(
-        text(
+    if isinstance(invitation, Invitation):
+        set_tenant(db, invitation.tenant_id)
+        db.execute(text("SELECT public.lock_schedule(:tenant)"), {"tenant": invitation.tenant_id})
+        activate = text(
             "SELECT public.activate_invited_user(:invite, :login, :recipient, :password, :mfa, :step)"
-        ),
+        )
+    else:
+        activate = text(
+            "SELECT public.activate_platform_operator("
+            ":invite, :login, :recipient, :password, :mfa, :step)"
+        )
+    user_id = db.scalar(
+        activate,
         {
             "invite": invitation.id,
             "login": login,
@@ -93,7 +141,18 @@ def activate_account(
     db.flush()
     session = auth.get_session(db, settings, session_token)
     db.add(UserProfile(user_id=user_id, details=profile.model_dump()))
-    accept_invitation(db, settings, session, invitation.id, correlation_id)
+    if isinstance(invitation, Invitation):
+        accept_invitation(db, settings, session, invitation.id, correlation_id)
+    else:
+        db.add(
+            PlatformAudit(
+                actor_id=user_id,
+                action="platform_operator.activated",
+                resource_id=invitation.id,
+                correlation_id=correlation_id,
+                created_at=moment,
+            )
+        )
     return session_token, csrf
 
 

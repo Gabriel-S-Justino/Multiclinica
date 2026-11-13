@@ -13,6 +13,8 @@ O Admin gera convites na clínica ativa. O Superadmin escolhe uma clínica exist
 
 A conta do Superadmin exige um registro global de operador ativo e MFA. Após entrar, o Superadmin abre **Administração da plataforma** e pode consultar os indicadores e a auditoria com exportação CSV. A auditoria reúne metadados de eventos da plataforma e das clínicas. Uma conta técnica de mensageria tem acesso limitado às operações de seu canal.
 
+Em **Administração da plataforma → Usuários → Cadastrar Superadmin**, informe um e-mail ainda sem conta no portal e compartilhe o código de ativação com o destinatário. O código vale por 24 horas e pode ser usado uma vez. Em **Ativar conta**, a pessoa convidada usa o mesmo e-mail, preenche os dados pessoais, define a senha e configura o autenticador. A conta é global e fica sem vínculo com clínica. A emissão e a ativação são registradas na auditoria da plataforma.
+
 O Superadmin pode excluir clínicas e contas de outros usuários. O Admin pode excluir um vínculo da própria clínica. A exclusão revoga acesso, remove o registro da operação e preserva o histórico. O último administrador ativo de uma clínica é protegido contra remoção pelo Admin.
 
 Em **Minha conta**, a pessoa atualiza os dados de contato e a foto. Senhas são protegidas com Argon2id. Sessões usam cookies seguros e mutações verificam CSRF e origem. A API exige MFA recente em operações administrativas sensíveis.

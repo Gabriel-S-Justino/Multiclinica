@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 
 from backend.application.contracts import Command
-from backend.application.identity_details import ClinicDetails
+from backend.application.identity_details import ClinicDetails, Email
 from backend.application.scheduling_commands import Mutation
 from backend.domain.scheduling import utc
 
@@ -155,6 +155,10 @@ class ResourceDraft(UnitDraft):
 class InvitationDraft(Mutation):
     login: str = Field(min_length=3, max_length=254)
     role: Literal["collaborator", "reception", "admin"]
+
+
+class PlatformInvitationDraft(Mutation):
+    login: Email
 
 
 class MembershipDraft(Versioned):

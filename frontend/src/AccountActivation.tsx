@@ -4,9 +4,11 @@ import { pt } from './locales';
 import { ProfileFields, profileFields } from './Profile';
 import { Feedback, Label, Modal, useAction } from './ui';
 
-export function ActivationCode({ code, onClose }: { code: string; onClose: () => void }) {
+export function ActivationCode({ code, onClose, hint = pt.activationShare }: {
+  code: string; onClose: () => void; hint?: string;
+}) {
   return <Modal title={pt.activationCode} size="narrow" onClose={onClose}>
-    <p className="note">{pt.activationShare}</p>
+    <p className="note">{hint}</p>
     <Label text={pt.activationCode}>
       <input readOnly value={code} onFocus={event => event.target.select()} />
     </Label>

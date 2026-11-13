@@ -4419,6 +4419,58 @@
         }
       }
     },
+    "/v1/platform/operators/invitations": {
+      "post": {
+        "summary": "Platform Invite Superadmin",
+        "operationId": "platform_invite_superadmin_v1_platform_operators_invitations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformInvitationDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Platform Invite Superadmin V1 Platform Operators Invitations Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
     "/v1/platform/users": {
       "get": {
         "summary": "Platform Users",
@@ -6273,6 +6325,28 @@
           "phone"
         ],
         "title": "PersonalDetails"
+      },
+      "PlatformInvitationDraft": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+            "title": "Idempotency Key"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "title": "Login"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "login"
+        ],
+        "title": "PlatformInvitationDraft"
       },
       "PlatformUserStatus": {
         "properties": {

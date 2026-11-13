@@ -22,6 +22,7 @@ from backend.application.portal_commands import (
     IntegrationDraft,
     InvitationDraft,
     MembershipDraft,
+    PlatformInvitationDraft,
     PlatformUserStatus,
     ProfessionalDraft,
     QueueDraft,
@@ -667,6 +668,15 @@ def register_portal_routes(
         return invitations.activation_receipt(
             settings, PlatformAdmin(ctx).invite_user(command, tenant_id)
         )
+
+    @app.post("/v1/platform/operators/invitations", status_code=202)
+    def platform_invite_superadmin(
+        command: PlatformInvitationDraft,
+        request: Request,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).invite_superadmin(command)
 
     @app.get("/v1/platform/users")
     def platform_users(

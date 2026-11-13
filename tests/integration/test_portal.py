@@ -760,6 +760,44 @@ def test_platform_operator_registration_is_independent_of_membership_role(portal
     p.call("GET", "/v1/platform/tenants", expected=403)
 
 
+def test_superadmin_invites_new_global_operator(portal):
+    p = portal
+    path = "/v1/platform/operators/invitations"
+    login = "new-operator@test.invalid"
+    command = p.command(login=login)
+    p.call("POST", path, command, expected=401)
+    p.login()
+    p.call("POST", path, command, expected=403)
+    p.login("superadmin")
+    p.call("POST", path, p.command(login="admin@test.invalid"), expected=409)
+    receipt = p.call("POST", path, command, expected=202).json()
+    assert p.call("POST", path, command, expected=202).json() == receipt
+
+    p.client.cookies.clear()
+    setup = "/v1/auth/activate/setup"
+    activation = {"login": login, "activation_code": receipt["activation_code"]}
+    p.call("POST", setup, activation | {"login": "other@test.invalid"}, expected=409)
+    key = p.call("POST", setup, activation, expected=200).json()["authenticator_key"]
+    totp = pyotp.TOTP(key)
+    credentials = activation | {
+        "authenticator_key": key,
+        "password": f"test-{uuid4().hex}",
+        "profile": {"full_name": "Operador Convidado", "email": login, "phone": "85999990000"},
+    }
+    bad_code = "000000" if totp.now() != "000000" else "111111"
+    p.call("POST", "/v1/auth/activate", credentials | {"code": bad_code}, expected=422)
+    p.call("POST", "/v1/auth/activate", credentials | {"code": totp.now()}, expected=200)
+    session = p.call("GET", "/v1/auth/session", expected=200).json()
+    assert session["platform_access"] and session["memberships"] == []
+    p.call("GET", "/v1/appointments?" + p.period(), expected=403)
+    p.call("POST", setup, activation, expected=409)
+    events = p.call("GET", "/v1/platform/audit?action=platform_operator.", expected=200).json()
+    assert {(row["action"], row["resource_id"]) for row in events["items"]} == {
+        ("platform_operator.invited", receipt["id"]),
+        ("platform_operator.activated", receipt["id"]),
+    }
+
+
 def test_profile_details_and_photo_are_private(portal):
     p = portal
     p.login("reception")

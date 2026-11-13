@@ -8,12 +8,14 @@ from sqlalchemy.orm import aliased
 
 from backend.application.auth import revoke_user_sessions
 from backend.application.clinic_admin import ClinicAdmin
+from backend.application.invitations import platform_activation_code
 from backend.application.pagination import cursor_for, offset_for
 from backend.application.portal_access import PortalContext, PortalError, now
 from backend.application.portal_commands import (
     BreakGlassDecision,
     InvitationDraft,
     MembershipDraft,
+    PlatformInvitationDraft,
     PlatformUserStatus,
     TenantDraft,
     Versioned,
@@ -35,6 +37,7 @@ from backend.infrastructure.portal_models import (
     BreakGlassRequest,
     Invitation,
     PlatformAudit,
+    PlatformInvitation,
     PlatformOperator,
     ServiceQueue,
 )
@@ -142,6 +145,36 @@ class PlatformAdmin:
         if command.role != "admin":
             raise PortalError("validation_failed", 422)
         return self.invite_user(command, tenant_id)
+
+    def invite_superadmin(self, command: PlatformInvitationDraft) -> dict[str, Any]:
+        self.operator(write=True)
+        replay = self.ctx.replay("platform.operator_invite", command)
+        if replay is None:
+            login = command.login.lower()
+            if self.db.scalar(select(User.id).where(User.login == login)) is not None:
+                raise PortalError("platform_login_exists", 409)
+            invitation_id = uuid4()
+            code = platform_activation_code(self.ctx.settings, invitation_id)
+            expires_at = now(self.db) + timedelta(days=1)
+            self.db.add(
+                PlatformInvitation(
+                    id=invitation_id,
+                    issuer_id=self.ctx.identity.user_id,
+                    recipient_hash=digest(self.ctx.settings, "invite-recipient", login),
+                    proof_hash=digest(self.ctx.settings, "platform-invitation-proof", code),
+                    expires_at=expires_at,
+                )
+            )
+            self.audit(None, "platform_operator.invited", invitation_id)
+            replay = self.ctx.save(
+                "platform.operator_invite",
+                command,
+                {"id": str(invitation_id), "expires_at": expires_at.isoformat()},
+            )
+        return {
+            **replay,
+            "activation_code": platform_activation_code(self.ctx.settings, UUID(replay["id"])),
+        }
 
     def invite_user(self, command: InvitationDraft, tenant_id: UUID) -> dict[str, Any]:
         self.operator(write=True)

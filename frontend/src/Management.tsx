@@ -6,7 +6,7 @@ import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, P
 import type { Catalog, EntityReceipt, IntegrationState, Membership, Page, Queue, RecordData, SupportRequest } from './types';
 
 type Option = {value:string; label:string};
-export type Field = {name:string; label:string; type?:'text'|'number'|'checkbox'|'date'|'time'|'minutes'|'select'|'multi'|'datetime'; options?:Option[]; optional?:boolean; initial?:unknown; when?:{name:string; value:boolean}; group?:string; hint?:string};
+export type Field = {name:string; label:string; type?:'text'|'email'|'number'|'checkbox'|'date'|'time'|'minutes'|'select'|'multi'|'datetime'; options?:Option[]; optional?:boolean; initial?:unknown; when?:{name:string; value:boolean}; group?:string; hint?:string};
 type Values = Record<string, unknown>;
 
 export const clinicRoles = ['collaborator','reception','admin'].map(value=>({value,label:pt.roles[value]}));
@@ -53,7 +53,7 @@ export function Editor({title, fields, initial, busy, onSave, onCancel, action, 
       {field.type==='select' ? <select required={!field.optional} value={String(values[field.name]??'')} onChange={event=>set(field.name,event.target.value)}>
         <option value="">{pt.select}</option>{field.options?.map(option=><option value={option.value} key={option.value}>{option.label}</option>)}</select> :
         <input name={field.name} type={field.type==='minutes'?'text':field.type==='datetime'?'datetime-local':field.type??'text'} inputMode={field.type==='number'||field.type==='minutes'?'numeric':undefined} min={field.type==='number'?0:undefined}
-          pattern={field.type==='minutes'?'([01][0-9]|2[0-3]):[0-5][0-9]|24:00':undefined} placeholder={field.type==='minutes'?pt.hourFormat:undefined} required={!field.optional} maxLength={field.type==='text'||!field.type?254:undefined}
+          pattern={field.type==='minutes'?'([01][0-9]|2[0-3]):[0-5][0-9]|24:00':undefined} placeholder={field.type==='minutes'?pt.hourFormat:undefined} required={!field.optional} maxLength={field.type==='text'||field.type==='email'||!field.type?254:undefined}
           value={field.type==='minutes' && typeof values[field.name]==='number'?minutes(values[field.name] as number):String(values[field.name]??'')} onChange={event=>set(field.name,event.target.value)}/>}
     </Label>;
   }

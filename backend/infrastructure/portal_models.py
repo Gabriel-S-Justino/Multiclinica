@@ -116,6 +116,16 @@ class PlatformOperator(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class PlatformInvitation(Base):
+    __tablename__ = "platform_invitations"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    issuer_id: Mapped[UUID] = mapped_column(ForeignKey("platform_operators.user_id"))
+    recipient_hash: Mapped[str] = mapped_column(String(64))
+    proof_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class PlatformAudit(Base):
     __tablename__ = "platform_audit_logs"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

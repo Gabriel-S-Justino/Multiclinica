@@ -37,6 +37,7 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
   const [tab,setTab]=useState<'overview'|'clinics'|'users'|'audit'>('overview');
   const [editing,setEditing]=useState<Clinic|RecordData|null>(null);
   const [invite,setInvite]=useState<Clinic|null>(null);
+  const [invitingSuperadmin,setInvitingSuperadmin]=useState(false);
   const [code,setCode]=useState('');
   const [clinicCursor,setClinicCursor]=useState('');
   const [userCursor,setUserCursor]=useState('');
@@ -58,6 +59,7 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
   return <>
     <PageHeader title="Administração da plataforma">
       {tab==='clinics'&&<button onClick={()=>{action.clearError();setEditing({});}}><Icon name="plus" size={16}/>{pt.newClinic}</button>}
+      {tab==='users'&&<button onClick={()=>{action.clearError();setInvitingSuperadmin(true);}}><Icon name="plus" size={16}/>Cadastrar Superadmin</button>}
     </PageHeader>
     <div className="form-actions platform-tabs">
       <button className={tab==='overview'?'':'secondary'} aria-pressed={tab==='overview'} onClick={()=>setTab('overview')}>Visão geral</button>
@@ -88,7 +90,8 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
       {users.isPending?<Loading/>:users.isError?<Failure error={users.error}/>:!users.data.items.length?<Empty icon="user"/>:
         <div className="record-list">{users.data.items.map(user=><article className="record-card" key={user.id}>
           <div className="record-main"><div className="record-title"><h2>{user.details?.full_name??user.login}</h2><span className={`badge ${user.active?'active':'inactive'}`}>{user.active?pt.active:pt.inactive}</span></div>
-          {user.details&&<p className="muted">{user.login}</p>}</div>
+          {user.details&&<p className="muted">{user.login}</p>}
+          {user.platform_operator&&<p className="muted">Superadmin</p>}</div>
           <button className="secondary" onClick={()=>{action.clearError();setSelected(user);}}>Ver cadastro</button>
         </article>)}</div>}
       <div className="form-actions">{userCursor&&<button className="secondary" onClick={()=>setUserCursor('')}>Primeira página</button>}
@@ -101,7 +104,16 @@ export function Platform({member,userId}:{member:Membership;userId:string}) {
         const result=await action.send<{activation_code:string}>(`/platform/tenants/${invite.id}/invitations`,{login,role});
         setInvite(null);setCode(result.activation_code);
       },pt.invitationRequested)}/>}
-    {code&&<ActivationCode code={code} onClose={()=>setCode('')}/>}
+    {invitingSuperadmin&&<Editor title="Cadastrar Superadmin" fields={[{name:'login',label:'E-mail do novo Superadmin',type:'email'}]}
+      busy={action.busy} action={action} onCancel={()=>setInvitingSuperadmin(false)}
+      intro={<p className="note">Use um e-mail ainda sem conta no portal. O convite expira em 24 horas. A pessoa convidada informa os dados pessoais, cria a senha e configura o autenticador ao ativar a conta.</p>}
+      onSave={({login})=>void action.run(async()=>{
+        const result=await action.send<{activation_code:string}>('/platform/operators/invitations',{login});
+        setInvitingSuperadmin(false);
+        setCode(result.activation_code);
+      },pt.invitationRequested)}/>}
+    {code&&<ActivationCode code={code} onClose={()=>setCode('')}
+      hint={tab==='users'?'Compartilhe o código em particular com o destinatário. Ele poderá ativar a conta na tela de login em até 24 horas.':undefined}/>}
     {permissionsClinic&&<ClinicPermissions clinic={permissionsClinic} member={member} onClose={()=>setPermissionsClinic(null)}/>}
     {selected&&<UserRecord user={selected} busy={action.busy} action={action} onClose={()=>setSelected(null)}
       onDelete={selected.id===userId?undefined:()=>void action.run(async()=>{await action.send(`/platform/users/${selected.id}`,{},'DELETE');setSelected(null);},'Usuário excluído.')}
