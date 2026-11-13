@@ -1,29 +1,26 @@
-# Preparação de WhatsApp e IA na Multiclínica
+# Implantação assistida de uma clínica
 
-Este documento descreve o fluxo disponível no painel de Integrações. Cadastrar as informações não ativa automaticamente o envio pelo WhatsApp nem a IA.
+Use [o portal Multiclinica](https://multclinicai.vercel.app) para demonstração e treinamento com dados fictícios. Faça a liberação para pacientes conforme o [roteiro de produção](release-runbook.md).
 
-## Passos de configuração
+## Informações da clínica
 
-1. Em Configurações, crie uma fila ativa de atendimento com expediente e atendentes.
-2. Na Meta Cloud API obtenha a identificação da WABA, Phone Number ID, versão atual do Graph API, Access Token e App Secret. Crie um Verify Token forte.
-3. Em Integrações → WhatsApp, informe os sete campos e clique em Salvar configuração. Os três segredos são criptografados e não retornam na leitura.
-4. Clique em Verificar credenciais para uma consulta de metadados à Meta. Isso não prova recebimento do webhook ou capacidade de envio.
-5. Clique em Vincular número à clínica. A operação cria um canal e uma conta técnica com menor privilégio. O envio começa desligado.
-6. Copie a URL de webhook exibida, cadastre-a na Meta com o Verify Token e assine o evento messages.
-7. Implemente um executor durável de mensagens para invocar process e send do módulo backend.messaging_cli. O painel sozinho não agenda workers. O Vercel Hobby não suporta cron a cada minuto.
-8. Após testes reais e revisão clínica, de segurança e de privacidade, execute um procedimento aprovado para habilitar o envio. Nunca faça isso apenas para simular sucesso.
+| Área | Informação a confirmar |
+|---|---|
+| Cadastro | Nome fantasia, razão social, CNPJ, endereço, fuso horário e responsável |
+| Equipe | Login do administrador, profissionais, recepção, horários e responsáveis pelas filas |
+| Atendimento | Serviços, regras de agendamento, política de identificação, expediente e aviso fora do horário |
+| WhatsApp | WABA ID, Phone Number ID, versão Graph, Access Token, App Secret e Verify Token |
+| IA opcional | Chave OpenAI, modelo compatível, limites mensal e por conversa, referências da política de dados e do contrato |
+| Operação | Contatos de suporte e incidentes, retenção, recuperação e critérios de liberação |
 
-## Inteligência artificial
+O administrador da clínica informa os segredos diretamente no portal. Compartilhe identificadores e referências pelo canal de implantação e mantenha tokens e chaves no gerenciador de segredos ou nos campos protegidos.
 
-1. Em Integrações → Inteligência artificial, escolha OpenAI, informe o identificador exato do modelo e a API key em um campo protegido.
-2. Clique em Verificar credenciais. O botão consulta apenas metadados do modelo; não há geração de respostas.
-3. A IA continua desativada: faltam adaptador de produção, avaliação de qualidade, política de dados, orçamento e fluxo clínico aprovado. A fronteira atual permite apenas classificação restrita de intenções, sem diagnóstico nem mutações de consultas.
+## Configurar e homologar
 
-## Limitações de operação
+1. O Superadmin cadastra a clínica e convida o administrador. A pessoa ativa a conta com seu código, senha e MFA. O administrador cria unidades, profissionais, serviços e uma fila ativa com responsáveis e expediente.
+2. Em **Integrações**, o administrador salva e verifica as credenciais do WhatsApp e vincula o número. Cadastre a URL exibida na Meta com o Verify Token e assine o evento `messages`.
+3. A equipe Multiclinica inicia e monitora o [executor de filas](messaging-implementation.md). Com número e dados de teste, valide webhook assinado, mensagem recebida, processamento, encaminhamento humano e resposta registrada. Habilite o envio de teste com o comando documentado e confirme o retorno de entrega da Meta. Teste pausa, duplicata e recuperação de falha.
+4. Para IA, siga o [guia da OpenAI](ai-provider-setup.md). Use frases fictícias para testar o direcionamento, a resposta inválida, a indisponibilidade e o limite de consumo.
+5. Registre as evidências, o responsável pela aprovação e o procedimento de pausa. A clínica e a equipe liberam o canal para pacientes após a homologação e a revisão de privacidade.
 
-- Nesta versão, cada clínica admite um canal de WhatsApp; a troca de número exige rotação controlada.
-- O número precisa estar autorizado e registrado na Meta. A coexistência com WhatsApp Business App depende das opções oficiais disponíveis para a conta.
-- Um canal provisionado recebe webhook com verificação de assinatura, mas não processa nem envia mensagens automaticamente sem worker externo.
-- Não use dados reais de pacientes antes da homologação e da aprovação de privacidade, retenção e resposta a incidentes.
-- Nenhuma credencial deve ser compartilhada por chat, logs, código ou repositórios.
-- A função administrativa de provisionamento está na migração 0006. A aplicação usa MFA recente, valida fila ativa, isolamento da clínica, hash de senha técnica aleatória e envio desativado por padrão.
+Fontes: [WhatsApp Business Platform](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview) e [OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).

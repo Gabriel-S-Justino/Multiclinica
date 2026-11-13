@@ -31,8 +31,8 @@ export const pt = {
   empty:'Nenhum profissional disponível para este acesso.', professionals:'Profissionais autorizados', choose:'Selecionar clínica',
   recovery:'Recuperar acesso', recoveryInfo:'Solicitação registrada. Procure o administrador para recuperar o acesso.',
   recoveryToken:'Código de recuperação', newPassword:'Nova senha', resetPassword:'Redefinir senha', haveRecovery:'Já tenho um código', // pragma: allowlist secret (rótulos da interface)
-  passwordReset:'Senha redefinida. Entre novamente.', backLogin:'Voltar ao login',
-  changeOwnPassword:'Alterar minha senha', myAccount:'Minha conta', currentPassword:'Senha atual', confirmNewPassword:'Confirmar nova senha',
+  passwordReset:'Senha redefinida. Entre novamente.', backLogin:'Voltar ao login', // pragma: allowlist secret (rótulo)
+  changeOwnPassword:'Alterar minha senha', myAccount:'Minha conta', currentPassword:'Senha atual', confirmNewPassword:'Confirmar nova senha', // pragma: allowlist secret (rótulos da interface)
   passwordMismatch:'As novas senhas não coincidem.', passwordChanged:'Senha alterada. Entre com a nova senha e aguarde o próximo código do Authenticator.', // pragma: allowlist secret (rótulos da interface)
   foundation:'Sua equipe, seus horários e cada atendimento em um só lugar.',
   noRecords:'Nenhum registro para exibir.', save:'Salvar alterações', saved:'Alterações salvas.', create:'Cadastrar', edit:'Editar',
@@ -96,7 +96,7 @@ export const pt = {
   aiProvider:'Provedor da IA', aiModel:'Identificador do modelo', verifyConnection:'Verificar credenciais', verifiedCredentials:'Credenciais aceitas pelo provedor. Isso não ativa o atendimento.',
   setupIncomplete:'Preencha os dados obrigatórios antes de validar.', requireQueue:'Cadastre e ative uma fila em Configurações antes de conectar o número.',
   provisionChannel:'Vincular número à clínica', provisionedChannel:'Canal criado com envio desativado. Copie o webhook e finalize a configuração na Meta.',
-  integrationSteps:{fill_credentials:'Completar os dados de configuração', provision_channel:'Vincular canal WhatsApp à clínica (provisionamento técnico pendente)', channel_mismatch:'O número não corresponde ao canal provisionado', enable_delivery:'Validar integração e habilitar envio controlado', configure_worker:'Configurar executor periódico de mensagens', verify_meta:'Verificar webhook na Meta', enable_ai_adapter:'Vincular modelo de IA ao atendimento (ainda não habilitado)', approve_data_policy:'Aprovar política de dados para uso de IA'},
+  integrationSteps:{fill_credentials:'Completar os dados de configuração', provision_channel:'Vincular canal WhatsApp à clínica (provisionamento técnico pendente)', channel_mismatch:'O número não corresponde ao canal provisionado', enable_delivery:'Validar integração e habilitar envio controlado', configure_worker:'Confirmar que o executor de mensagens está em operação', verify_meta:'Verificar webhook na Meta', enable_ai_adapter:'Habilitar a interpretação de opções do menu', approve_data_policy:'Aprovar política de dados para uso de IA'},
   audit:'Auditoria', auditDescription:'Acompanhe as operações registradas na clínica.', action:'Operação', resource:'Recurso', when:'Quando', correlation:'Correlação',
   supportRequests:'Acesso excepcional', supportDescription:'Revise pedidos de suporte. A aprovação libera somente a consulta indicada e por tempo limitado.',
   approve:'Aprovar acesso', reject:'Rejeitar pedido', revoke:'Revogar acesso', requestAccess:'Solicitar acesso excepcional',
@@ -109,13 +109,14 @@ export const pt = {
   roles: {collaborator:'Colaborador', reception:'Recepção', admin:'Admin da clínica', superadmin:'Superadmin'} as Record<string,string>,
   statuses: {scheduled:'Agendada', confirmed:'Confirmada', completed:'Concluída', canceled:'Cancelada', no_show:'Falta', rescheduled:'Remarcada',
     held:'Reservada', waiting:'Aguardando', assigned:'Em atendimento', released:'Devolvida ao bot', closed:'Encerrada', queued:'Na fila de envio', received:'Recebida', sent:'Aceita pelo provedor',
-    sending:'Enviando', delivered:'Entregue', read:'Lida', failed:'Falha de entrega', unknown:'Entrega não confirmada', blocked:'Envio bloqueado', dead:'Falha — revisão necessária',
+    sending:'Enviando', delivered:'Entregue', read:'Lida', failed:'Falha de entrega', unknown:'Entrega não confirmada', blocked:'Envio bloqueado', dead:'Falha: revisão necessária',
     pending:'Pendente', approved:'Aprovado', rejected:'Rejeitado', revoked:'Revogado', accepted:'Aceito'} as Record<string,string>,
   queueKinds: {general:'Atendimento geral',financial:'Financeiro',administrative:'Administrativo'} as Record<string,string>,
   reasons: {patient_request:'Pedido do contato',financial:'Financeiro',administrative:'Administrativo',identity_verification:'Verificação de identidade',other:'Outro'} as Record<string,string>,
   weekdays:['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'],
   errors: {channel_already_exists:'Esta clínica já possui um número vinculado.', channel_provision_failed:'Não foi possível criar o canal. A migração administrativa deve estar aplicada.', integration_incomplete:'Preencha todas as informações obrigatórias antes de verificar.', invalid_integration_fields:'Confira identificadores, versão da API, fila e credenciais.', provider_verification_failed:'O provedor rejeitou a conexão. Revise a chave, permissões e os identificadores.', provider_unavailable:'Não foi possível consultar o provedor agora. Tente novamente.', channel_mismatch:'O canal já vinculado usa outros identificadores; solicite rotação controlada.', reauthentication_required:'Por segurança, saia e entre novamente com o autenticador para realizar esta operação.',
     invalid_photo:'Escolha uma foto JPEG válida.',
+    pause_delivery_first:'Peça ao suporte para pausar o envio antes de alterar a configuração do WhatsApp.',
     clinic_registration_required:'Preencha os dados de identificação, contato e endereço da clínica.',
     activation_unavailable:'O convite está indisponível para este login. Se você já tem conta, entre para aceitar o convite.',
     activation_mfa_invalid:'O código do autenticador é inválido ou expirou. Confira o código atual.',

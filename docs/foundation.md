@@ -1,4 +1,4 @@
-# Fundação implementada — F2
+# Fundação implementada · F2
 
 Data: 31/10/2026. Estado: base local implementada; não é MVP completo nem deploy de produção. Ver [relatório F2](reports/f2-foundation.md).
 
@@ -73,6 +73,6 @@ Runner usa porta livre em loopback, cluster novo e senhas aleatórias, desliga P
 
 CI configurado para executar checks, dependências, migrations, banco e navegador em push/PR. Não foi executado no GitHub nesta sessão, pois não houve push. Runner Linux configurado para PostgreSQL 17; o resultado local em Windows/18 não é prova de execução Linux.
 
-## Atualização F3 — 31/10/2026
+## Atualização F3 · 31/10/2026
 
 F2 aprovada. O motor de agendamento F3 e os novos contratos/migrations estão em [scheduling-implementation.md](scheduling-implementation.md). Este documento preserva o escopo da fundação.

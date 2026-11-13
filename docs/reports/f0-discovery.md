@@ -1,16 +1,16 @@
-# Relatório F0 — Descoberta
+# Relatório F0 · Descoberta
 
 Data: 31/10/2026. Estado: documentação produzida; gate de aprovação pendente.
 
 ## Entrega
 
-Escopo MVP e exclusões, D1–D16 propostas, metas não funcionais, perguntas bloqueantes, ambiguidades e resolução proposta. Não há aplicação, migrations, integrações ou testes de execução nesta fase.
+Escopo MVP e exclusões, D1-D16 propostas, metas não funcionais, perguntas bloqueantes, ambiguidades e resolução proposta. Não há aplicação, migrations, integrações ou testes de execução nesta fase.
 
 ## Arquivos
 
 - `README.md`: entrada do projeto e estado real.
 - `docs/discovery.md`: premissas, perguntas, metas e ambiguidades.
-- `docs/decisions/0001-discovery-defaults.md`: D1–D16 com status e dependências.
+- `docs/decisions/0001-discovery-defaults.md`: D1-D16 com status e dependências.
 - `docs/requirements.md`: escopo e rastreabilidade inicial por grupo.
 - `docs/reports/f0-discovery.md`: este relatório.
 

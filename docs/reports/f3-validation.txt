@@ -1,4 +1,4 @@
-F3 — verificação local — 31/10/2026
+F3 · verificação local · 31/10/2026
 
 Comando: ruff check backend tests scripts
 All checks passed!

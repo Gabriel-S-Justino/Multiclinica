@@ -1,4 +1,4 @@
-# ADR 0001 — Padrões da descoberta D1–D16
+# ADR 0001 · Padrões da descoberta D1-D16
 
 Data: 31/10/2026. Histórico: propostas na F0; padrões aprovados pelo usuário em 31/10/2026 para orientar a F1. A aprovação não preenche valores, contratos ou escolhas que permaneceram em aberto (D3, D6, D9, D12, D13, D15). Este registro agrupa as decisões para revisão; alterações posteriores devem preservar o histórico.
 
@@ -14,7 +14,7 @@ Data: 31/10/2026. Histórico: propostas na F0; padrões aprovados pelo usuário 
 | D8 | Estratégia `LeastFutureLoad` intercambiável | Carga futura no período definido, primeiro horário e desempate auditável; período a definir | F3 |
 | D9 | Antecedência e limite de remarcação por serviço; sem cobrança | Valores pendentes da clínica | F3 |
 | D10 | Bot apenas agenda e encaminha | Texto de emergência fixo aprovado pela clínica | F6 |
-| D11 | Sem convênios/preços no MVP; bot não informa preços | Reduz escopo financeiro | — |
+| D11 | Sem convênios/preços no MVP; bot não informa preços | Reduz escopo financeiro | · |
 | D12 | Retenção configurável; conteúdo de mensagens criptografado | Prazo, chaves e descarte dependem de política aprovada; nenhum prazo escolhido | F7 |
 | D13 | Provedor de IA condicionado a contrato/DPA, região e retenção avaliados | Não há provedor nem tratamento internacional aprovado | F6 |
 | D14 | Apenas texto; orientar mídia não suportada e oferecer humano | Respeitar silêncio durante handoff | F5 |

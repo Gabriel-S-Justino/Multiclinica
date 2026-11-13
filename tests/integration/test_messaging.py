@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from backend.domain.permissions import ContactPrincipal
 from backend.domain.scheduling import SchedulingError
 from backend.infrastructure.fields import seal, unseal
 from backend.infrastructure.messaging_models import (
+    AIUsage,
     Dispatch,
     InboundJob,
     MessagingChannel,
@@ -30,6 +32,7 @@ from backend.infrastructure.scheduling_models import (
     ConversationState,
 )
 from backend.infrastructure.whatsapp import ProviderFailure
+from backend.messaging_cli import active_channels, set_delivery
 from tests.integration.test_scheduling import scheduling  # noqa: F401
 
 
@@ -229,6 +232,109 @@ def test_webhook_auth_before_parse_routing_and_persistent_dedup(messaging):
         ).status_code
         == 403
     )
+
+
+def test_configured_ai_routes_only_menu_and_preserves_fallback(messaging, monkeypatch):
+    p = messaging
+    calls = []
+    original_post = httpx.Client.post
+
+    def fake_post(self, url, **kwargs):
+        if url != "https://api.openai.com/v1/chat/completions":
+            return original_post(self, url, **kwargs)
+        calls.append(kwargs["json"])
+        assert kwargs["json"]["store"] is False
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={
+                "usage": {"total_tokens": 120},
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"intent":"book","confidence":0.95,"needs_clarification":false}'
+                        }
+                    }
+                ],
+            },
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    integration_id = uuid4()
+    tenant_id = p.h.ids["tenant"]
+    with Session(p.h.admin) as db, db.begin():
+        db.add(
+            IntegrationConfig(
+                id=integration_id,
+                tenant_id=tenant_id,
+                provider="ai",
+                version=1,
+                updated_at=datetime.now(UTC),
+                credentials_ciphertext=seal(
+                    p.h.settings,
+                    tenant_id,
+                    "integration",
+                    integration_id,
+                    "ai",
+                    json.dumps(
+                        {
+                            "enabled": "true",
+                            "provider": "openai",
+                            "model": "synthetic",
+                            "api_key": uuid4().hex,
+                            "data_policy_reference": "TEST",
+                            "contract_reference": "TEST",
+                            "monthly_tokens": "4096",
+                            "conversation_tokens": "4096",
+                        }
+                    ),
+                ),
+            )
+        )
+    p.step("menu")
+    assert p.step("tenho dor")[0] == "MENU"
+    assert not calls
+    assert p.step("quero marcar um horário")[0] == "SERVICE"
+    assert len(calls) == 1
+    p.step("menu")
+    assert p.step("quero marcar outro horário")[0] == "MENU"
+    assert len(calls) == 1
+    with Session(p.h.admin) as db:
+        usage = db.scalar(select(AIUsage))
+        assert (usage.status, usage.used_tokens) == ("complete", 120)
+        assert not db.scalar(select(func.count()).select_from(Appointment))
+
+
+def test_worker_discovers_channels_and_delivery_requires_matching_configuration(messaging):
+    p = messaging
+    assert active_channels(p.h.runtime) == [p.channel_id]
+    with Session(p.h.admin) as db, db.begin():
+        with pytest.raises(SystemExit, match="incompleta"):
+            set_delivery(db, p.h.settings, p.channel_id, True)
+        channel = db.get(MessagingChannel, p.channel_id)
+        row = db.scalar(select(IntegrationConfig))
+        values = {
+            "access_token": p.secret,
+            "app_secret": p.secret,
+            "verify_token": p.secret,
+            "phone_number_id": channel.phone_number_id,
+            "account_id": channel.account_id,
+            "queue_id": str(channel.default_queue_id),
+            "graph_version": "v25.0",
+        }
+        row.credentials_ciphertext = seal(
+            p.h.settings,
+            channel.tenant_id,
+            "integration",
+            row.id,
+            "whatsapp",
+            json.dumps(values),
+        )
+        db.flush()
+        set_delivery(db, p.h.settings, p.channel_id, True)
+        assert channel.send_enabled and channel.graph_version == "v25.0"
+        set_delivery(db, p.h.settings, p.channel_id, False)
+        assert not channel.send_enabled
 
 
 def test_whatsapp_real_domain_booking_and_duplicate_confirmation(messaging):

@@ -1,6 +1,6 @@
-# ADR 0006 — WhatsApp determinístico e fila PostgreSQL
+# ADR 0006 · WhatsApp determinístico e fila PostgreSQL
 
-31/10/2026. Autorizada a continuidade F4–F8 pelo usuário ("aprove tudo"). Isso substitui a espera por novos gates; relatórios e verificações continuam obrigatórios. Não preenche credenciais, políticas clínicas/jurídicas, contas ou contratos ausentes.
+31/10/2026. Autorizada a continuidade F4-F8 pelo usuário ("aprove tudo"). Isso substitui a espera por novos gates; relatórios e verificações continuam obrigatórios. Não preenche credenciais, políticas clínicas/jurídicas, contas ou contratos ausentes.
 
 Escolha D6: fila PostgreSQL transacional para o volume inicial, sem novo fornecedor. Mensagem autenticada e job são a mesma linha persistida. Worker explícito por canal, lock de clínica/conversa, tentativas limitadas e DLQ. PostgreSQL exige worker agendado/contínuo fora da função HTTP; execução de background em memória não é aceita. Comparação: fila gerenciada reduz polling e oferece agendamento próprio, mas adiciona fornecedor, custo e consistência distribuída; migrar via interface quando medições justificarem.
 

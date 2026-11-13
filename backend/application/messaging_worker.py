@@ -9,6 +9,7 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from backend.application.messaging_flow import Flow
+from backend.application.messaging_intent import menu_intent
 from backend.application.webhooks import channel_for, credentials
 from backend.config import Settings
 from backend.domain.scheduling import SchedulingError
@@ -243,7 +244,19 @@ def process_one(engine: Engine, settings: Settings, channel_id: UUID) -> bool:
                     else:
                         try:
                             with db.begin_nested():
-                                flow.handle(payload["text"], payload["type"])
+                                flow.handle(
+                                    payload["text"],
+                                    payload["type"],
+                                    lambda message: menu_intent(
+                                        db,
+                                        engine,
+                                        settings,
+                                        channel.tenant_id,
+                                        session.id,
+                                        str(job.id),
+                                        message,
+                                    ),
+                                )
                                 db.flush()
                         except (SchedulingError, ValidationError, ValueError):
                             db.expire_all()

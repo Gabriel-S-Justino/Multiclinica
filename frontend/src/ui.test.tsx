@@ -12,5 +12,5 @@ test('semana da agenda começa na segunda-feira', () => {
   expect(weekStart('2026-11-09')).toBe('2026-11-09');
   expect(weekStart('2026-11-12')).toBe('2026-11-09');
   expect(weekStart('2026-11-15')).toBe('2026-11-09');
-  expect(formatRange('2026-11-09', '2026-11-15')).toBe('9 – 15 de nov. de 2026');
+  expect(formatRange('2026-11-09', '2026-11-15')).toBe('9 a 15 de nov. de 2026');
 });

@@ -82,8 +82,8 @@ def test_credential_settings_are_sealed_and_never_exposed():
         "graph_version": "v25.0",
         "queue_id": str(ctx.db.queue.id),
         "access_token": "synthetic-access-token-012345",
-        "app_secret": "synthetic-app-secret-012345",
-        "verify_token": "synthetic-verify-token-012345",
+        "app_secret": "synthetic-app-secret-012345",  # pragma: allowlist secret (fixture sintética)
+        "verify_token": "synthetic-verify-token-012345",  # pragma: allowlist secret (fixture sintética)
     }
     result = integration.save(
         "whatsapp", IntegrationDraft(version=0, idempotency_key=str(uuid4()), credentials=values)
@@ -110,7 +110,7 @@ def test_metadata_update_preserves_existing_secrets():
     initial = {
         "provider": "openai",
         "model": "synthetic-model",
-        "api_key": "synthetic-api-token-000000",
+        "api_key": "synthetic-api-token-000000",  # pragma: allowlist secret (fixture sintética)
     }
     integration.save(
         "ai", IntegrationDraft(version=0, idempotency_key=str(uuid4()), credentials=initial)
@@ -130,5 +130,5 @@ def test_metadata_update_preserves_existing_secrets():
     ai = next(item for item in exposed if item["provider"] == "ai")
     assert ai["metadata"]["model"] == "next-model"
     assert ai["setup_complete"] is True
-    assert ai["pending_steps"] == ["enable_ai_adapter", "approve_data_policy"]
+    assert ai["pending_steps"] == ["approve_data_policy", "enable_ai_adapter"]
     assert "synthetic-api-token-000000" not in str(exposed)

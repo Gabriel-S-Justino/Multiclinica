@@ -1,4 +1,6 @@
-# ADR 0007 — IA sem autoridade sobre operações
+# ADR 0007 · IA sem autoridade sobre operações
+
+Registro histórico. O estado vigente está no [guia de implantação](../integration-onboarding.md) e nas [permissões atuais](../users-and-permissions.md).
 
 31/10/2026. Autorizada a execução das partes independentes da F6. D13 (provedor/contrato/região/base e política de dados), orçamento e mensagem de emergência aprovada continuam sem definição. Não habilitar chamada externa ou processamento de texto de paciente por aprovação genérica de execução.
 

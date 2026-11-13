@@ -47,11 +47,11 @@ erDiagram
 
 Soft delete/desativação em serviços e profissionais com histórico. Não apagar appointment para cancelar. Dados pessoais sujeitos a descarte/anônimização por rotina privilegiada aprovada; remover chaves/vínculos conforme política sem apagar indevidamente registros obrigatórios. Nenhum cascade amplo para dados auditados. Migrações terão upgrade do zero/com dados; rollback destrutivo exige plano explícito, não downgrade automático de produção.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
 
 
-## Atualização F3 — 31/10/2026
+## Atualização F3 · 31/10/2026
 
 A migração 0002 acrescenta serviços/habilitações, agendas/exceções/bloqueios/feriados, contatos/pacientes/vínculos, holds/appointments/recursos/transições, conversa mínima, idempotência e outbox. Todas essas entidades têm RLS e FKs escopadas. O DDL congelado está em backend/migrations/versions/0002_scheduling.py; ver [guia F3](scheduling-implementation.md).

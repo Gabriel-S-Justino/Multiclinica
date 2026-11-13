@@ -1,9 +1,9 @@
-F0 — validação documental — 2026-10-31
+F0 · validação documental · 2026-10-31
 git diff --check: PASS
 Arquivo presente: README.md
 Arquivo presente: docs/discovery.md
 Arquivo presente: docs/decisions/0001-discovery-defaults.md
 Arquivo presente: docs/requirements.md
 Arquivo presente: docs/reports/f0-discovery.md
-D1–D16 presentes: PASS
+D1-D16 presentes: PASS
 Testes de aplicação: NÃO EXECUTADOS (fase documental)

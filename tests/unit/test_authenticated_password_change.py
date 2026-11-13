@@ -54,7 +54,7 @@ def account(monkeypatch):
                 active=True,
                 is_service=False,
                 last_totp_step=-1,
-                mfa_secret="configured-in-test",
+                mfa_secret="configured-in-test",  # pragma: allowlist secret (fixture sintética)
             )
         )
         db.add(Tenant(id=tid, name="Test", active=True, timezone="America/Sao_Paulo"))

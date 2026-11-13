@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -38,13 +39,17 @@ class Tenant(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="America/Sao_Paulo")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     version: Mapped[int] = mapped_column(default=0)
-    registration: Mapped[dict[str, str | None] | None] = mapped_column(JSONB)
+    registration: Mapped[dict[str, str | None] | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite")
+    )
 
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
-    details: Mapped[dict[str, str | None] | None] = mapped_column(JSONB)
+    details: Mapped[dict[str, str | None] | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite")
+    )
     photo: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
 
 

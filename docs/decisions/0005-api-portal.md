@@ -1,4 +1,6 @@
-# ADR 0005 — F4: API e portal
+# ADR 0005 · F4: API e portal
+
+Registro histórico. O estado vigente está no [guia de implantação](../integration-onboarding.md) e nas [permissões atuais](../users-and-permissions.md).
 
 Data: 31/10/2026. F3 aprovada; desenho apresentado antes da implementação. Estado: em execução, sujeito ao gate F4.
 

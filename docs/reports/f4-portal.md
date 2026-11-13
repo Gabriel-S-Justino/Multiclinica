@@ -1,4 +1,4 @@
-# Relatório F4 — API e portal
+# Relatório F4 · API e portal
 
 Data: 31/10/2026. F3 aprovada pelo usuário. Implementação local da F4; validação local concluída, aguardando gate. Não foi iniciado o WhatsApp F5, nem realizado push ou deploy.
 
@@ -24,4 +24,4 @@ Apresentar o resultado final da validação F4 e aguardar aprovação antes de i
 
 ## Aprovação registrada
 
-F4 aprovada pelo usuário em 31/10/2026 com autorização geral de continuidade (aprove tudo). Os próximos gates não exigem nova confirmação genérica; ver relatório F5–F8.
+F4 aprovada pelo usuário em 31/10/2026 com autorização geral de continuidade (aprove tudo). Os próximos gates não exigem nova confirmação genérica; ver relatório F5-F8.

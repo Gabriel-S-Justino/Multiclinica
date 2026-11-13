@@ -2,6 +2,7 @@
 
 import json
 import secrets
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.application.ai_boundary import Intent
 from backend.application.scheduling import Scheduler
 from backend.application.scheduling_commands import (
     AppointmentMutation,
@@ -130,9 +132,7 @@ class Flow:
         self.say(
             prompt
             + "\n"
-            + "\n".join(
-                f"{nonce}:{index + 1} — {label}" for index, (label, _) in enumerate(options)
-            )
+            + "\n".join(f"{nonce}:{index + 1}: {label}" for index, (label, _) in enumerate(options))
             + "\nResponda com o código completo. Menu, voltar, cancelar fluxo ou humano."
         )
 
@@ -404,7 +404,7 @@ class Flow:
             [("Confirmar", {"confirm": True}), ("Cancelar fluxo", {"confirm": False})],
         )
 
-    def handle(self, text: str, kind: str) -> None:
+    def handle(self, text: str, kind: str, classify: Callable[[str], Intent] | None = None) -> None:
         value = text.strip()
         command = value.casefold()
         if command == "parar":
@@ -476,6 +476,17 @@ class Flow:
             self.review()
             return
         option = self.data.get("options", {}).get(value)
+        if option is None and stage == "MENU" and classify is not None:
+            intent = classify(value)
+            if intent in {Intent.BOOK, Intent.SERVICES}:
+                self.services()
+                return
+            if intent == Intent.HUMAN:
+                self.handoff()
+                return
+            if intent == Intent.MENU:
+                self.menu()
+                return
         if option is None:
             self.data["ambiguity"] = self.data.get("ambiguity", 0) + 1
             if self.data["ambiguity"] >= self.channel.ambiguity_limit:

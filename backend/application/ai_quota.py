@@ -33,7 +33,10 @@ def reserve(
     ):
         raise ValueError("invalid_ai_quota")
     set_tenant(db, tenant_id)
-    db.execute(text("SELECT public.lock_schedule(:tenant)"), {"tenant": tenant_id})
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
+        {"scope": f"ai-quota:{tenant_id}"},
+    )
     moment = db.scalar(select(func.clock_timestamp()))
     if not isinstance(moment, datetime):
         raise RuntimeError("clock_unavailable")

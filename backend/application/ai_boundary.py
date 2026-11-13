@@ -69,22 +69,21 @@ def clinical_language(text: str) -> bool:
     )
 
 
+def eligible_turn(turn: SafeTurn) -> bool:
+    return (
+        turn.state == "MENU"
+        and 0 < len(turn.text) <= 500
+        and not clinical_language(turn.text)
+        and re.search(r"@|https?://|\d", turn.text) is None
+    )
+
+
 def interpret_safely(
     provider: IntentInterpreter | None, config: AIConfig, turn: SafeTurn, *, quota_reserved: bool
 ) -> IntentResult:
     fallback = IntentResult(intent=Intent.UNKNOWN, needs_clarification=True, confidence=0.0)
     config.validate()
-    if (
-        not config.enabled
-        or provider is None
-        or not quota_reserved
-        or turn.state != "MENU"
-        or len(turn.text) > 1000
-        or clinical_language(turn.text)
-    ):
-        return fallback
-    # Common direct identifiers must not cross the model boundary even with approval.
-    if re.search(r"@|https?://|\d{3,}", turn.text):
+    if not config.enabled or provider is None or not quota_reserved or not eligible_turn(turn):
         return fallback
     started = time.monotonic()
     try:

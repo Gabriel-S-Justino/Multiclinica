@@ -1,10 +1,10 @@
-# Privacidade e incidentes — procedimento para revisão
+# Privacidade e incidentes · procedimento para revisão
 
 Este é um procedimento técnico pendente de validação pelo controlador e jurídico. Não declara conformidade LGPD. Fonte legal consultada em 31/10/2026: [texto atualizado da Lei 13.709/2018 na Câmara](https://www2.camara.leg.br/legin/fed/lei/2018/lei-13709-14-agosto-2018-787077-normaatualizada-pl.html). Regras e prazos aplicáveis devem ser confirmados pelos responsáveis com a regulamentação vigente.
 
 ## Pendências de ativação
 
-Preencher: controlador e operador, encarregado/canal de contato, finalidades e bases por tratamento, política para menores/dependentes, retenção e preservação por categoria, contratos/suboperadores, regiões/transferência, texto clínico fixo, política de incidentes e responsáveis de plantão. Aprovação de implementação não preenche esses dados. IA não recebe texto de paciente até aprovação específica e configuração.
+Preencher: controlador e operador, encarregado/canal de contato, finalidades e bases por tratamento, política para menores/dependentes, retenção e preservação por categoria, contratos/suboperadores, regiões/transferência, texto clínico fixo, política de incidentes e responsáveis de plantão. Aprovação de implementação não preenche esses dados. Habilite a IA somente após a aprovação da política da clínica e da avaliação do provedor. Consulte [Configuração da IA](ai-provider-setup.md).
 
 ## Solicitação de titular
 

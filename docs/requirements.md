@@ -26,17 +26,17 @@ Os IDs abaixo seguem o Master.md. A F1 detalhará cada requisito em critérios e
 | RF-HU-01 a RF-HU-04 | F4/F5 | Filas, permissões, expediente, assumir e devolver ao bot | Não implementado |
 | RF-PT (seção 4.5, sem sub-IDs na fonte) | F2/F4 | RBAC por endpoint, isolamento e e2e acessível | Portal F4 verificado localmente e aprovado |
 | RF-IA-01 a RF-IA-13 | F6 | Schemas, ferramentas autorizadas, minimização, cotas e zero violações na suíte adversária | Não implementado |
-| Segurança (seção 7) | F2–F7 | Autenticação, RLS avaliada, CSRF, IDOR, injeções, scans | Controles F2/F3 verificados localmente; hardening F7 pendente |
+| Segurança (seção 7) | F2-F7 | Autenticação, RLS avaliada, CSRF, IDOR, injeções, scans | Controles F2/F3 verificados localmente; hardening F7 pendente |
 | Integridade (seção 8) | F1/F3 | Constraints, transações e concorrência em PostgreSQL real | F3 verificada; pool Neon real e carga pendentes |
-| Operação/deploy (seções 11–12) | F7/F8 | Restauração, build, staging e observação real | Não implementado |
+| Operação/deploy (seções 11-12) | F7/F8 | Restauração, build, staging e observação real | Não implementado |
 
 Os requisitos sem ID individual na fonte receberão IDs complementares na F1 sem renomear os IDs existentes.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
 
 
-## Continuidade F5–F8 — 31/10/2026
+## Continuidade F5-F8 · 31/10/2026
 
 A matriz inicial conserva o plano histórico. Estado atual e evidências: [relatório de continuidade](reports/continuation-f5-f8.md). RF-WA/RF-CV/RF-HU possuem implementação determinística local; conta Meta e entrega real pendentes. RF-IA possui fronteira e cotas testadas; adaptador escolhido, ligação ao fluxo e configuração aprovadas pendentes, IA desligada. Hardening local e empacotamento preparados; direitos/retentiva, conformidade e staging/produção não concluídos.

@@ -1,4 +1,6 @@
-# F8 — staging publicado e verificação remota
+# F8 · staging publicado e verificação remota
+
+Registro histórico. O estado vigente está no [guia de implantação](../integration-onboarding.md) e nas [permissões atuais](../users-and-permissions.md).
 
 Alvo confirmado: `clbrfrancaa/projeto-extensao-staging`, ID `prj_ncn1i5U1cQNjjLQxIeurJh54rtL1`, plano Hobby. Framework FastAPI, Node 24.x, Python 3.12 e região proposta de função `gru1`. Origem reservada verificada pela API: `https://projeto-extensao-staging.vercel.app`.
 
@@ -18,7 +20,7 @@ Fases anteriores: 148 testes Python, 3 componentes e 1 fluxo Chromium aprovados;
 
 O histórico abaixo registra a autorização, o primeiro problema de publicação e sua resolução. A seção final contém a verificação remota concluída. Não há ativação de WhatsApp, IA nem produção clínica neste passo.
 
-## Histórico do primeiro deploy — autorização específica posteriormente concedida
+## Histórico do primeiro deploy · autorização específica posteriormente concedida
 
 O envio de Preview a partir do commit local `2f72fdb52658` foi recusado pela CLI com `first_deployment_production`: o primeiro deploy de um projeto Vercel deve usar o canal Production. Não ocorreu upload/deploy bem-sucedido.
 
@@ -34,7 +36,7 @@ A página inicial retornou 404. Os logs comprovaram Python 3.12, instalação de
 
 Foi criada uma clínica de demonstração claramente identificada como sintética, com administrador de MFA e parâmetros exclusivos de teste. Credenciais aleatórias permanecem em arquivo privado local, sem envio ao chat. Nenhuma configuração foi interpretada como política real de clínica.
 
-## Resultado remoto — 31/10/2026
+## Resultado remoto · 31/10/2026
 
 URL de demonstração: **https://projeto-extensao-staging.vercel.app**. Deploy `dpl_Gpsvo82nQwDS5rJSsQ74XXDZEFQY`, estado READY, fonte `e3c29f3b90cec2232a9026ff4467c986b973647b`. O canal Vercel é Production somente porque o serviço exige esse canal para iniciar o projeto; a aplicação e o banco continuam exclusivamente de staging (`APP_ENV=staging`).
 
@@ -58,4 +60,4 @@ As instruções de acesso, senha aleatória e segredo para cadastrar o autentica
 
 ## Fontes
 
-Consultadas em 31/10/2026: [papéis Neon](https://github.com/neondatabase/website/blob/main/content/docs/manage/roles.md) — papéis criados por Console/API/CLI recebem `neon_superuser`; SQL permite papéis limitados; [acesso ao banco](https://github.com/neondatabase/website/blob/main/content/docs/manage/database-access.md); [regiões Vercel](https://vercel.com/docs/functions/configuring-functions/region); [referência de integração Vercel](https://vercel.com/docs/integrations/create-integration/vercel-api-integrations). Os limites do plano foram lidos da instalação real, sem upgrade ou contratação paga.
+Consultadas em 31/10/2026: [papéis Neon](https://github.com/neondatabase/website/blob/main/content/docs/manage/roles.md) · papéis criados por Console/API/CLI recebem `neon_superuser`; SQL permite papéis limitados; [acesso ao banco](https://github.com/neondatabase/website/blob/main/content/docs/manage/database-access.md); [regiões Vercel](https://vercel.com/docs/functions/configuring-functions/region); [referência de integração Vercel](https://vercel.com/docs/integrations/create-integration/vercel-api-integrations). Os limites do plano foram lidos da instalação real, sem upgrade ou contratação paga.

@@ -127,7 +127,7 @@ export function formatRange(first: string, last: string): string {
   const format = (day: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('pt-BR', {...options, timeZone:'UTC'}).format(utcNoon(day));
   if (first === last) return formatLongDay(first);
   const sameMonth = first.slice(0,7) === last.slice(0,7);
-  return `${format(first, sameMonth ? {day:'numeric'} : {day:'numeric',month:'short'})} – ${format(last, {day:'numeric',month:'short',year:'numeric'})}`;
+  return `${format(first, sameMonth ? {day:'numeric'} : {day:'numeric',month:'short'})} a ${format(last, {day:'numeric',month:'short',year:'numeric'})}`;
 }
 export function formatInstant(value: string, timezone?: string): string {
   const date = new Date(value);

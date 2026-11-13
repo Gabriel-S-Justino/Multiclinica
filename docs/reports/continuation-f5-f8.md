@@ -1,4 +1,6 @@
-# Continuidade F5–F8
+# Continuidade F5-F8
+
+Registro histórico. O estado vigente está no [guia de implantação](../integration-onboarding.md) e nas [permissões atuais](../users-and-permissions.md).
 
 31/10/2026. O usuário aprovou a F4 e autorizou seguir sem novos gates com "aprove tudo". A autorização foi registrada em ADR 0006. Posteriormente foi publicado e verificado um staging Vercel/Neon gratuito, com autorização específica para o canal remoto exigido. Decisões clínicas/jurídicas e configuração de provedores continuam necessárias. Não houve push, envio WhatsApp ou chamada real de IA. Veja o [resultado remoto da F8](f8-staging.md).
 

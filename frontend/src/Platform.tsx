@@ -140,10 +140,10 @@ function UserRecord({user,busy,action,onClose,onChange}:{user:PlatformUser;busy:
     <Feedback action={action} errorsOnly/>
     <dl className="review-grid">
       <dt>Login</dt><dd>{user.login}</dd>
-      <dt>E-mail de contato</dt><dd>{details?.email??'—'}</dd>
-      <dt>Telefone</dt><dd>{details?.phone??'—'}</dd>
-      <dt>Função</dt><dd>{details?.job_title??'—'}</dd>
-      <dt>Registro profissional</dt><dd>{details?.professional_registration??'—'}</dd>
+      <dt>E-mail de contato</dt><dd>{details?.email??'Não informado'}</dd>
+      <dt>Telefone</dt><dd>{details?.phone??'Não informado'}</dd>
+      <dt>Função</dt><dd>{details?.job_title??'Não informado'}</dd>
+      <dt>Registro profissional</dt><dd>{details?.professional_registration??'Não informado'}</dd>
       <dt>Situação</dt><dd>{user.active?pt.active:pt.inactive}</dd>
     </dl>
     {!user.platform_operator&&<ConfirmButton label={user.active?'Desativar acesso':'Reativar acesso'} title={user.active?'Desativar acesso':'Reativar acesso'}

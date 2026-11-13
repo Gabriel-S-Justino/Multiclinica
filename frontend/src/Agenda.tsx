@@ -56,7 +56,7 @@ export function Agenda({member}: {member:Membership}) {
               : <div className="day-link"><span>{formatWeekday(day)}</span><strong>{formatDay(day)}</strong></div>}
               {rows.length>0 && <span className="day-count" aria-hidden="true">{rows.length}</span>}{isToday && <span className="today-pill">{pt.today}</span>}</header>
             <div className="day-body">{rows.map(row=><button type="button" key={row.id} className={`appointment-card appointment-${row.status}`} onClick={()=>setSelected(row.id)}>
-              <span className="appointment-time">{row.local_start}–{row.local_end}</span><strong>{row.patient_name}</strong><span>{row.service_name}</span><small>{row.professional_name}</small><Status value={row.status}/>
+              <span className="appointment-time">{row.local_start} a {row.local_end}</span><strong>{row.patient_name}</strong><span>{row.service_name}</span><small>{row.professional_name}</small><Status value={row.status}/>
             </button>)}{!rows.length && <Empty compact>{pt.noAppointments}</Empty>}</div></section>;
         })}
       </div>}

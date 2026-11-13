@@ -1,26 +1,20 @@
-# Release e operação de staging
+# Release e liberação para produção
 
-31/10/2026. O staging gratuito está publicado em https://projeto-extensao-staging.vercel.app, com Neon, MFA obrigatório e dados exclusivamente sintéticos. A autorização específica cobriu o canal Production do projeto isolado mantendo `APP_ENV=staging`. [Verificação remota e limites](reports/f8-staging.md). Não houve push para GitHub ou ativação de produção clínica. Não inserir tokens no chat.
+O [portal Multiclinica](https://multclinicai.vercel.app) é o endereço atual de demonstração. O [relatório F8](reports/f8-staging.md) registra testes de um ambiente histórico com dados fictícios. Use as evidências do ambiente escolhido para a aprovação de produção.
 
-## Artefatos
+## Preparação da equipe Multiclinica
 
-`pyproject.toml` declara entrypoint `backend.asgi:app` e Python 3.12. `vercel.json` prepara frontend em `public/`, configura a mesma origem para portal e API e cabeçalhos de segurança. HashRouter dispensa reescrita de rotas clínicas. `.vercelignore` exclui ferramentas, banco local, fixtures, documentação e arquivos de ambiente. Essas configurações precisam ser verificadas no build Vercel real; build Vite local não prova o empacotamento da função.
+1. Confirme o ambiente, o plano, a região, o banco e o responsável pela operação. O uso comercial na Vercel requer um plano que permita essa finalidade. [Política da Vercel](https://vercel.com/docs/limits/fair-use-guidelines)
+2. Configure `APP_ENV`, `PUBLIC_ORIGIN` HTTPS, MFA, `DATABASE_URL` do runtime e as chaves `TOKEN_KEY` e `FIELD_KEY`. Use a conexão direta de migração exclusivamente no processo de release. Aplique `alembic upgrade head` antes de publicar alterações de esquema.
+3. Publique o commit validado. Confira `/v1/health`, `/v1/ready`, os arquivos estáticos, login e MFA, convites, perfil, permissões por clínica e agenda. Teste tentativas de acesso entre clínicas e de acesso clínico pelo Superadmin.
+4. Inicie o [executor de WhatsApp](messaging-implementation.md) em serviço supervisionado. Defina alertas para parada do processo, atraso da fila, entregas desconhecidas e falhas. Verifique que o serviço encontra novos canais sem reiniciar.
+5. Teste backup e restauração num destino isolado. Valide chaves, revisão do esquema, permissões, registros cifrados e contagens. Meça a perda de dados admissível e o tempo de recuperação. Faça ensaio de carga autorizado no ambiente de teste, com volume e metas acordados.
+6. Defina responsáveis, política de identificação e retenção, acesso, incidentes, contratos e transferência de dados. Use o [guia de privacidade](privacy-operations.md).
 
-## Checklist para reproduzir staging e etapas operacionais restantes
+## Liberação por clínica
 
-- Selecionar projetos Vercel/Neon, plano e regiões compatíveis. Confirmar limites atuais de função/payload/cron e PITR/retentiva no plano real.
-- Criar banco de staging separado. Provisionar papéis de migração e runtime conforme migração 0001; runtime sem superuser/BYPASSRLS e sem propriedade de tabelas.
-- Guardar `DATABASE_URL` pooled apenas no runtime e `MIGRATION_DATABASE_URL` direta somente no processo de release. Chaves HMAC/cifra distintas por ambiente; guardar cópia recuperável em secret manager, separada de backup.
-- Definir `APP_ENV=staging`, origem pública HTTPS exata e MFA obrigatório. Usar conta exclusiva de demonstração com senha aleatória, MFA e dados sintéticos nos smoke tests; não usar credenciais fixas de fixtures ou dados reais.
-- Executar release checks e `alembic upgrade head` fora de HTTP. Não colocar migração automática por requisição ou ao iniciar função.
-- Publicar staging; testar cookies, CSRF, cache, headers, login/MFA, seleção de clínica, IDOR, agenda, handoff, outbox e health/readiness. Verificar conexão pooled real e btree_gist.
-- Configurar invocações duráveis de worker compatíveis com latência requerida. Cron minuto a minuto não comprova meta de resposta menor que 8 segundos. Não manter loop residente dentro de função serverless.
-- Registrar número de teste Meta, webhook e versão oficial vigente. Fazer teste sintético de recebimento/envio/entrega e janela; somente depois habilitar envio controlado.
+Use o [roteiro de implantação assistida](integration-onboarding.md). Registre as evidências por clínica, com responsável e data. Dados da Meta, chave e modelo de IA, políticas da clínica e validação de entrega entram nessa etapa. Antes de aceitar pacientes reais, confirme também o plano de hospedagem, a execução monitorada das filas e a recuperação no ambiente de destino.
 
-## Produção
+Em caso de incidente, pause o envio pelo comando `disable`. Reverta a aplicação para um artefato compatível com o esquema e restaure em um destino separado quando necessário. Reconcilie as entregas de estado desconhecido com a Meta antes de qualquer reenvio.
 
-Exige responsáveis, políticas de identidade/retenção, contratos/DPA/região/transferência, texto fixo clínico aprovado, metas medidas, backup restaurado no destino e revisão dos achados de dependências. A IA permanece desligada sem provedor/modelo e política aprovados. O relatório distingue o que foi testado localmente do que depende do destino.
-
-Rollback de app: promover artefato anterior compatível com schema; não executar downgrade destrutivo em produção. Pausar entrada/envio se integridade ou isolamento estiverem em dúvida. Restaurar em banco separado, verificar schema/RLS/grants/cifra e conciliar eventos/entregas antes de trocar conexão. `unknown` não é seguro para reenvio automático. Reaplicar políticas de descarte aprovadas após recuperação.
-
-Fontes: [FastAPI na Vercel](https://vercel.com/docs/frameworks/backend/fastapi), [runtime Python](https://vercel.com/docs/functions/runtimes/python), [pooling Neon](https://neon.com/docs/connect/connection-pooling), consultadas em 31/10/2026. Referências não certificam o plano ainda não informado.
+Em 13/11/2026, o ensaio de recuperação do banco de demonstração no Neon restaurou um snapshot em branch separado. A revisão `0008` e as contagens de clínicas e usuários coincidiram com o banco de origem. O papel de runtime continuou sujeito às políticas de isolamento e a consulta de vínculos sem contexto retornou zero registros. A janela de histórico informada para o projeto era de seis horas. A aprovação do ambiente comercial exige validar as chaves de cifra, a capacidade e as metas de recuperação no destino escolhido.

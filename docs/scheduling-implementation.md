@@ -1,4 +1,4 @@
-# Agendamento implementado — F3
+# Agendamento implementado · F3
 
 Data: 31/10/2026. Backend implementado por casos de uso; endpoints/telas de agenda pertencem à F4. WhatsApp/IA não são chamados. Nenhuma clínica real, credencial externa ou dado de paciente foi usado.
 
@@ -45,7 +45,7 @@ Falhas SQL de integridade são convertidas em erros de domínio sem parâmetros 
 
 As decisões reais D3/D9 não foram preenchidas pela aprovação da fase. Serviço sem `policy_validated` fica bloqueado. Duração, antecedências, buffers, horizonte, remarcações e campos mínimos são configuração explícita; não existe seed de política clínica de produção.
 
-Paciente existente exige vínculo contato–paciente registrado manualmente pela clínica: método manual_clinic, responsável, instante, validade e ausência de revogação. Telefone/nascimento isolados não verificam ninguém. Vínculo pode representar dependente, mas o procedimento/evidência exigidos pela clínica ainda precisam ser definidos. Sem verificação não há consulta/alteração automatizada; erros de operação não expõem se um appointment existe.
+Paciente existente exige vínculo contato-paciente registrado manualmente pela clínica: método manual_clinic, responsável, instante, validade e ausência de revogação. Telefone/nascimento isolados não verificam ninguém. Vínculo pode representar dependente, mas o procedimento/evidência exigidos pela clínica ainda precisam ser definidos. Sem verificação não há consulta/alteração automatizada; erros de operação não expõem se um appointment existe.
 
 Paciente novo: finalidade reconhecida, nome validado; nascimento só é aceito se exigido no serviço e não pode ser futuro na data local da clínica. Nome não é usado para deduplicar ou vincular automaticamente a pessoa existente. Novo vínculo é declarado e fica **não verificado** para futuras alterações; encaminhamento humano será conectado nas próximas fases. Não há CPF.
 

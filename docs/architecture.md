@@ -1,5 +1,7 @@
 # Arquitetura proposta
 
+Este documento registra o desenho original. Consulte o [índice técnico](README.md) e o [roteiro de release](release-runbook.md) para a operação vigente.
+
 Status: arquitetura alvo F1; fundação parcialmente implementada na F2 (ver atualização ao final). Requisitos: RF-CV, RF-AG, RF-IA, seções 5, 7 e 12 do Master.
 
 ```mermaid
@@ -36,11 +38,11 @@ Estrutura futura: `frontend/src/{app,features,shared,locales}`, `backend/{presen
 
 Login/MFA/recuperação; agenda dia/semana; configuração de expediente/exceções; serviços; colaboradores; inbox; auditoria; integrações write-only; gestão de clínicas. Cada tela tem loading, vazio, erro e acesso negado. Navegação por teclado, foco visível, rótulos, contraste e mensagens de erro associadas são critérios de e2e/axe. Cache deve ser limpo em logout/troca de clínica; chaves incluem escopo autenticado.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
 
 
-## Atualização F3 — 31/10/2026
+## Atualização F3 · 31/10/2026
 
 A F3 acrescentou o motor de agendamento, comandos na camada de aplicação, domínio puro, persistência e eventos transacionais. Ver [implementação F3](scheduling-implementation.md).

@@ -1,4 +1,4 @@
-# Relatório F2 — Fundação
+# Relatório F2 · Fundação
 
 Data: 31/10/2026. F1 aprovada pelo usuário. Entrega local, sujeita ao gate F2; sem push ou deploy.
 

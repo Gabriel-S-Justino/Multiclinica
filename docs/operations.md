@@ -1,29 +1,19 @@
-# Operação proposta
+# Operação
 
-Sem serviço rodando. Donos operacionais e contatos ainda precisam ser indicados.
+O portal e a API expõem `/v1/health` e `/v1/ready`. A prontidão verifica a conexão de runtime e suas restrições. O executor de mensagens roda em serviço supervisionado, conforme o [guia de mensageria](messaging-implementation.md).
 
-Logs estruturados com correlation ID, tenant opaco, ação, duração e resultado; nunca corpo de mensagem ou segredo. Métricas: ACK/p95, erro, atraso de fila, retries/DLQ, conflito de agenda, entrega desconhecida, cota/latência de IA e handoff. Dimensões com cardinalidade limitada; dados pessoais não são labels.
+| Evento | Procedimento |
+|---|---|
+| API ou banco indisponível | Verifique a prontidão, o deploy e a conexão do runtime. Confirme o retorno do webhook e deduplicação após a recuperação. |
+| Executor parado ou fila atrasada | Confira o processo e o atraso de entrada e saída. Reinicie o executor supervisionado e confirme que a fila volta a avançar. |
+| Falha definitiva ou entrega desconhecida | Consulte o código operacional e reconcilie com a Meta. Use o mesmo identificador ao reprocessar um evento elegível. |
+| IA indisponível ou cota excedida | O menu permanece disponível. Confirme o modelo, a chave e os limites da clínica. |
+| Segredo comprometido | Revogue ou rotacione no provedor, atualize em Integrações e confira a operação com dados fictícios. |
+| Incidente de dados | Siga o [procedimento de privacidade e incidentes](privacy-operations.md). |
+| Falha de release | Promova uma versão compatível com o esquema. Suspenda o envio do canal quando necessário. |
 
-| Evento | Resposta planejada | Recuperação/evidência |
-|---|---|---|
-| IA indisponível/cota | Circuit breaker e menu determinístico/humano | Monitorar recuperação sem replay de mutações |
-| WhatsApp falha | Preservar outbox, retry limitado por classificação | Reconciliar timeout ambíguo; DLQ e reprocessamento auditado |
-| Banco indisponível no webhook | Não ACK de sucesso sem persistência | Verificar retries do provedor, restaurar conexão e deduplicar |
-| Fila atrasada | Alertar por idade e capacidade, suspender excesso | Reexecutar jobs por ID sem duplicar efeito |
-| Hold abandonado | Expiração por consulta, limpeza periódica | Não depende do job para liberar slot |
-| Segredo comprometido | Revogar/rotacionar e invalidar sessões afetadas | Verificar versão e registrar incidente sem valor secreto |
-| Vazamento/isolamento | Conter integração/tenant afetado, preservar evidência mínima | Responsável avalia impacto e comunicações com prazos validados |
-| Falha de release | Reverter código compatível; pausar novas mutações se necessário | Restaurar só por plano aprovado e teste |
+Registre metadados de operação e correlação. Acompanhe idade da fila, falhas, retentativas e confirmação de entrega. Defina responsáveis e limiares com base no ensaio de implantação.
 
-Backup: verificar plano/PITR, restaurar em ambiente isolado sem comunicações externas, checar integridade/constraints/contagens, reaplicar descartes e medir perda/tempo. Só registrar RPO/RTO atingidos com evidência real. Audit logs não devem ser alteráveis pelo usuário runtime; exportação imutável, acesso e retenção serão validados em F7.
+A restauração deve ocorrer num destino isolado, com executor e webhooks desligados. Valide a revisão do banco, regras de acesso, chaves de cifra e leitura dos dados recuperados. Compare contagens e meça a perda admissível e o tempo de recuperação. Antes de redirecionar a aplicação, reconcilie entregas e aplique as decisões de descarte aprovadas.
 
-Antes de produção: health check genérico, alertas e responsáveis definidos, runbook ensaiado, retenção e descarte configurados, credenciais separadas, planos/regiões verificados e restauração testada.
-
-## Atualização F2 — 31/10/2026
-
-Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
-
-
-## Atualização F3 — 31/10/2026
-
-Holds expirados não bloqueiam agenda mesmo sem limpeza; limpeza continua pendente operacional. Eventos ficam pending na outbox e ainda não têm dispatcher. Não executar migrations automaticamente por requisição. Ver [limites F3](scheduling-implementation.md).
+[Preparação e liberação](release-runbook.md)

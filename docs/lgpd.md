@@ -1,4 +1,4 @@
-# Plano de privacidade — pendente de validação
+# Plano de privacidade · pendente de validação
 
 Este documento é inventário técnico proposto; não afirma conformidade ou define base legal. D12/D13 dependem da clínica/jurídico. Não há pacientes reais neste repositório.
 
@@ -19,6 +19,6 @@ Direitos: solicitação autenticada → validação de identidade → análise d
 
 Prazos legais de comunicação, retenção e respostas estão não verificados; consultar fontes oficiais/jurídico na F7. Produção bloqueada sem política aprovada e mecanismo de execução/teste.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.

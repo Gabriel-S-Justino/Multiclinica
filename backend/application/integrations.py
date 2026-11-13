@@ -26,12 +26,23 @@ PROVIDER_FIELDS = {
         "graph_version",
         "queue_id",
     },
-    "ai": {"api_key", "provider", "model"},
+    "ai": {
+        "api_key",
+        "provider",
+        "model",
+        "enabled",
+        "data_policy_reference",
+        "contract_reference",
+        "monthly_tokens",
+        "conversation_tokens",
+    },
 }
+AI_CREDENTIALS = {"api_key", "provider", "model"}
+AI_POLICY = {"data_policy_reference", "contract_reference", "monthly_tokens", "conversation_tokens"}
 SECRET_FIELDS = {"access_token", "app_secret", "verify_token", "api_key"}
 METADATA_FIELDS = {
     "whatsapp": {"phone_number_id", "account_id", "graph_version", "queue_id"},
-    "ai": {"provider", "model"},
+    "ai": {"provider", "model", "enabled", *AI_POLICY},
 }
 
 
@@ -84,7 +95,8 @@ class Integrations:
         for provider in PROVIDER_FIELDS:
             row = rows.get(provider)
             values = self._values(row, provider)
-            complete = all(values.get(key) for key in PROVIDER_FIELDS[provider])
+            required = AI_CREDENTIALS if provider == "ai" else PROVIDER_FIELDS[provider]
+            complete = all(values.get(key) for key in required)
             metadata = {key: values[key] for key in METADATA_FIELDS[provider] if key in values}
             steps: list[str] = []
             if not complete:
@@ -103,8 +115,10 @@ class Integrations:
                 steps.append("configure_worker")
                 steps.append("verify_meta")
             else:
-                steps.append("enable_ai_adapter")
-                steps.append("approve_data_policy")
+                if not all(values.get(key) for key in AI_POLICY):
+                    steps.append("approve_data_policy")
+                if values.get("enabled") != "true":
+                    steps.append("enable_ai_adapter")
             response.append(
                 {
                     "provider": provider,
@@ -162,6 +176,19 @@ class Integrations:
                 raise PortalError("invalid_integration_fields", 422)
             if "model" in values and not re.fullmatch(r"[A-Za-z0-9._-]{1,120}", values["model"]):
                 raise PortalError("invalid_integration_fields", 422)
+            if values.get("enabled", "false") not in {"true", "false"}:
+                raise PortalError("invalid_integration_fields", 422)
+            limits = [
+                values.get(name, "4096") for name in ("conversation_tokens", "monthly_tokens")
+            ]
+            if any(not re.fullmatch(r"[0-9]{1,10}", limit) for limit in limits):
+                raise PortalError("invalid_integration_fields", 422)
+            if not 4096 <= int(limits[0]) <= int(limits[1]) <= 1_000_000_000:
+                raise PortalError("invalid_integration_fields", 422)
+            if values.get("enabled") == "true" and not all(
+                values.get(key, "").strip() for key in AI_CREDENTIALS | AI_POLICY
+            ):
+                raise PortalError("integration_incomplete", 409)
 
     def save(self, provider: str, command: IntegrationDraft) -> dict[str, Any]:
         moment = self.ctx.admin(write=True)
@@ -172,9 +199,9 @@ class Integrations:
             raise PortalError("invalid_integration_fields", 422)
         for key, value in command.credentials.items():
             raw = value.get_secret_value()
-            if not raw or len(raw) > 4096 or not raw.isascii() or not raw.isprintable():
+            if not raw.strip() or len(raw) > 4096 or not raw.isprintable():
                 raise PortalError("invalid_integration_fields", 422)
-            if key in SECRET_FIELDS and len(raw) < 12:
+            if key in SECRET_FIELDS and (len(raw) < 12 or not raw.isascii()):
                 raise PortalError("invalid_integration_fields", 422)
         replay = self.ctx.replay("integration.save", command, provider)
         if replay is not None:
@@ -193,6 +220,17 @@ class Integrations:
         provided = {key: value.get_secret_value() for key, value in command.credentials.items()}
         values = {**previous, **provided}
         self._validate_values(provider, values)
+        if (
+            provider == "whatsapp"
+            and values != previous
+            and self.db.scalar(
+                select(MessagingChannel.id).where(
+                    MessagingChannel.tenant_id == self.ctx.tenant_id,
+                    MessagingChannel.send_enabled.is_(True),
+                )
+            )
+        ):
+            raise PortalError("pause_delivery_first", 409)
         if row is None:
             row = IntegrationConfig(id=uuid4(), tenant_id=self.ctx.tenant_id, provider=provider)
             self.db.add(row)
@@ -269,7 +307,8 @@ class Integrations:
         if provider not in PROVIDER_FIELDS:
             raise PortalError("invalid_integration_fields", 422)
         values = self._values(self._config(provider), provider)
-        if not all(values.get(key) for key in PROVIDER_FIELDS[provider]):
+        required = AI_CREDENTIALS if provider == "ai" else PROVIDER_FIELDS[provider]
+        if not all(values.get(key) for key in required):
             raise PortalError("integration_incomplete", 409)
         if provider == "whatsapp":
             self._validate_values(provider, values)

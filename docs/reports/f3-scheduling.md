@@ -1,4 +1,4 @@
-# Relatório F3 — Agendamento
+# Relatório F3 · Agendamento
 
 Data: 31/10/2026. F2 aprovada pelo usuário nesta sessão. F3 implementada por casos de uso, aguardando gate. Nenhum push, contratação, deploy ou mensagem externa.
 
@@ -41,10 +41,10 @@ A revisão também corrigiu a validação de nascimento para usar o dia local da
 
 | Requisito | Evidência de teste |
 |---|---|
-| 01–04 | availability_and_pagination, holiday_exception_and_block, duration_override_and_buffers, scheduling_professional_permissions |
+| 01-04 | availability_and_pagination, holiday_exception_and_block, duration_override_and_buffers, scheduling_professional_permissions |
 | 05 | DTO com IDs/horários; apresentação do resumo ao paciente fica para API/portal F4 e WhatsApp F5 |
 | 06 | least_future_load_orders_load_then_time_then_stable_id, uses_future_active_duration, does_not_penalize_completed_history |
-| 07–08 | new_patient_is_encrypted_and_not_automatically_verified, rls_idor_and_unverified_patient, register_contact_is_minimal_encrypted_and_idempotent |
+| 07-08 | new_patient_is_encrypted_and_not_automatically_verified, rls_idor_and_unverified_patient, register_contact_is_minimal_encrypted_and_idempotent |
 | 09 | confirm_consumes_hold_and_atomically_finishes_conversation, failure_after_booking_writes_rolls_back_every_effect |
 | 10 | overlapping_reschedule_is_atomic_and_transfers_resource, reschedule_failure_after_writes_preserves_old_and_hold, clinic_policy_limits |
 | 11 | fifty_simultaneous_holds, fifty_simultaneous_confirmations, fifty_direct_sql_inserts, runtime_sql_resource_overlap |

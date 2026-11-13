@@ -1,6 +1,6 @@
 # Deploy e verificação de capacidades
 
-Estado atual em 31/10/2026: staging gratuito Vercel/Neon publicado e verificado com dados sintéticos e MFA obrigatório. Consulte o [relatório F8](reports/f8-staging.md) para recursos, evidências e limitações atuais. As seções seguintes preservam o design e as verificações históricas F1/F2; não descrevem o estado remoto atual.
+O [portal atual de demonstração](https://multclinicai.vercel.app) e os critérios de operação estão no [roteiro de release](release-runbook.md). A tabela a seguir registra as verificações históricas de design.
 
 | Fonte oficial consultada | Evidência e consequência de design |
 |---|---|
@@ -19,7 +19,7 @@ Pendências: tamanho/duração/payload de função, cold starts, cron por plano,
 
 Release futuro: checks CI → migração controlada compatível → staging → smoke/e2e/carga → revisão → produção autorizada. Rollback exige compatibilidade de schema; sem migration destrutiva automática em requisição.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Fontes oficiais consultadas novamente em 31/10/2026: [runtime Python Vercel](https://vercel.com/docs/functions/runtimes/python), [versões FastAPI](https://fastapi.tiangolo.com/deployment/versions/), [dialeto SQLAlchemy/psycopg](https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#psycopg), [prepared statements psycopg](https://www.psycopg.org/psycopg3/docs/advanced/prepare.html), [Neon pooling](https://neon.com/docs/connect/connection-pooling) e [Vite](https://vite.dev/guide/). Python 3.12 está listado no runtime Vercel; Neon documenta pooling em modo transação. prepare_threshold=None desabilita preparação automática no driver, escolha conservadora implementada. Isso não substitui teste real no destino, que continua pendente. Lockfiles e execução local comprovam apenas compatibilidade no ambiente testado.
 

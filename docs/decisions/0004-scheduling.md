@@ -1,4 +1,4 @@
-# ADR 0004 — Execução da F3
+# ADR 0004 · Execução da F3
 
 Data: 31/10/2026. F2 aprovada pelo usuário; decisões de implementação submetidas ao gate F3.
 

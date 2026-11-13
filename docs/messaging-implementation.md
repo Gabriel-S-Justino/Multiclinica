@@ -1,30 +1,35 @@
-# WhatsApp determinístico — operação local
+# Operação do WhatsApp
 
-Canal oficial atrás de `WhatsAppProvider`; [ADR 0006](decisions/0006-whatsapp.md). O adaptador Cloud API usa host fixo, TLS, timeout e nenhum redirecionamento. A versão Graph é configuração obrigatória para envio; nenhuma versão foi presumida. Não houve mensagem real nem validação de conta Meta.
+O Admin configura credenciais e vincula o número no portal. O webhook valida a assinatura antes de ler o JSON, confere a conta e o número, deduplica eventos e confirma recebimento depois de persistir o evento cifrado. Consulte o [roteiro assistido](integration-onboarding.md).
 
-## Configurar
+## Executor
 
-1. Aplicar migrações com credencial direta de migração. Runtime sem owner/BYPASSRLS.
-2. Criar fila ativa, atribuir atendentes e configurar expediente/aviso. Configurar políticas de serviço e verificação aprovadas pela clínica.
-3. Salvar credenciais WhatsApp na tela de integrações: são cifradas e somente de escrita.
-4. Em processo controlado, com URL de migração: `python -m backend.messaging_cli provision --tenant-id UUID --queue-id UUID --phone-number-id ID --account-id ID`. Cria conta técnica não interativa e canal com envio desligado.
-5. Webhook: `/v1/webhooks/whatsapp/CHANNEL_UUID`. GET de verificação e POST autenticado por HMAC. Conta e número precisam coincidir com o canal configurado. Assinatura é verificada sobre bytes antes do JSON.
-6. Worker limitado por invocação: `python -m backend.messaging_cli process --channel-id UUID --limit 50`; saída: `python -m backend.messaging_cli send --channel-id UUID --limit 50`. Use agendador/worker externo durável. Não executar como background em memória da função HTTP.
+Execute em um serviço supervisionado, com reinício automático e as mesmas configurações de runtime do portal. Configure `DATABASE_URL`, `PUBLIC_ORIGIN`, `APP_ENV`, `TOKEN_KEY` e `FIELD_KEY` no gerenciador de segredos. Use a role de runtime. O executor consulta os canais ativos em cada ciclo.
 
-Ativar envio exige validação da versão suportada, conta, número, permissões e credenciais reais; alterar o canal por processo privilegiado revisado. `send_enabled=false` preserva mensagens como enfileiradas. A configuração inicial não finge entrega.
+```sh
+uv sync --frozen --no-dev --python 3.12
+uv run --frozen --no-dev python -m backend.messaging_cli worker --interval 5 --limit 10
+```
 
-## Fluxo e proteção
+A aplicação HTTP e o executor são processos separados. Os comandos `process` e `send` com `--channel-id` continuam disponíveis para diagnóstico pontual.
 
-Menu → serviço → unidade → preferência por profissional → datas por semana → horários paginados → finalidade/cadastro mínimo → revisão → confirmação. Menus de texto usam código opaco completo, válido somente na etapa atual. Consultas existentes exigem vínculo manual vigente; sem ele a resposta é uniforme, sem revelar existência. Cancelamento e remarcação têm seleção e confirmação próprias. O motor F3 revalida disponibilidade e políticas dentro da transação.
+Execute `uv run --frozen --no-dev python -m backend.messaging_cli status` para ver os totais de entrada e saída por canal e se o envio está habilitado. A saída contém somente identificadores de canal e metadados operacionais.
 
-`menu`, `reiniciar` e `cancelar fluxo` encerram o fluxo e liberam o hold quando possível, sem cancelar consulta existente. `voltar` retorna à seleção preservando serviço/unidade e liberando o hold. Hold expirado não confirma. Inatividade pede reconfirmação; dados são revalidados antes de uso. `parar` registra opt-out; `retomar` inicia novo atendimento quando não há handoff ativo. Durante handoff o bot fica silencioso, inclusive para mídia; somente liberação explícita do atendente permite retomada. Mídia não é baixada.
+Em infraestrutura de contêineres, construa a imagem com `docker build -f Dockerfile.worker -t multiclinica-worker .` e configure as variáveis de runtime no serviço. Configure reinício automático e encaminhamento dos logs para o monitoramento da equipe. O processo não expõe porta HTTP.
 
-Ingestão deduplica por evento de canal. Banco e fila são atômicos; ACK somente após persistência. Ordenação local e lock impedem processamento simultâneo. Eventos externos atrasados não executam ação sensível. Payload, histórico e contexto temporário são cifrados; logs contêm somente metadados.
+## Ativar ou pausar envio
 
-Outbox revalida contato, opt-out e janela de 24 horas. Fora da janela bloqueia texto livre, inclusive do atendente. Templates proativos não foram implementados. Rede ambígua ou lease expirado vira `unknown`, sem reenvio automático. HTTP429 recebe backoff/jitter limitado; falhas definitivas viram `dead`. Callbacks não regridem `read`/`delivered`.
+A equipe usa o comando abaixo com `MIGRATION_DATABASE_URL` apenas no ambiente de administração, após conferir o webhook e os dados do canal. Habilite primeiro com número e destinatários de teste.
 
-## Recuperação e limites
+```sh
+uv run --frozen python -m backend.messaging_cli enable --channel-id UUID_DO_CANAL
+uv run --frozen python -m backend.messaging_cli disable --channel-id UUID_DO_CANAL
+```
 
-Monitorar `inbound_jobs.status/error_code/available_at` e `message_dispatches.status/error_code/lease_until`, sem exportar conteúdo. DLQ exige diagnóstico; reprocessar somente com mesmo evento/idempotência, após corrigir causa. Não reenviar `unknown` sem reconciliação humana com provedor. Rotação de credenciais invalida a configuração anterior; pausa controlada e teste sintético antes de reativar. Não há suporte automático a dois app secrets simultâneos.
+O canal começa com envio desligado. A habilitação confere credenciais presentes, fila ativa e correspondência dos identificadores. Confirme a entrega pelo retorno da Meta. Durante a pausa, o processamento de entrada continua e o envio pendente aguarda a retomada, sujeito à janela e à preferência do contato.
 
-Uma clínica é serializada por transação para integridade. O ensaio local de webhook não comprova p95 remoto, escala nem frequência do agendador contratado. Retenção e descarte permanecem pendentes de política aprovada. Não há produção pronta apenas por existir worker e adaptador.
+## Falhas e limites
+
+Monitore atraso, jobs com falha, entregas de estado desconhecido e parada do executor. A reconciliação de entregas desconhecidas é feita com a Meta antes de qualquer reenvio. Falhas transitórias elegíveis têm retentativas limitadas. Fora da janela de atendimento, o sistema bloqueia texto livre. O projeto ainda não oferece templates proativos.
+
+Cada clínica tem um canal. A troca de conta, número ou fila exige rotação acompanhada. O comando legado `provision` fica disponível para operação administrativa. Para o fluxo habitual, vincule o canal no portal.

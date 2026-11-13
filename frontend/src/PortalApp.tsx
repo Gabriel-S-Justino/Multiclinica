@@ -25,7 +25,7 @@ function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;inf
     setToken('');setReplacement('');setConfirmation('');
   }
   const [showPassword,setShowPassword]=useState(false);
-  const passwordType=showPassword?'text':'password';
+  const passwordType=showPassword?'text':'password'; // pragma: allowlist secret (tipo do campo)
   const reveal=<button type="button" className="text-button reveal-toggle" aria-pressed={showPassword} onClick={()=>setShowPassword(value=>!value)}><Icon name={showPassword?'eyeOff':'eye'} size={16}/>{pt.showPasswords}</button>;
   return <div className="auth-layout"><section className="auth-story" aria-label={pt.title}><div className="brand-lockup"><span className="brand" aria-hidden="true"><Icon name="plus" size={20}/></span><strong>{pt.title}</strong></div><div className="auth-story-copy"><h1>{pt.foundation}</h1>
       <ul className="auth-features">{pt.loginFeatures.map((item,index)=><li key={item}><span aria-hidden="true"><Icon name={(['calendar','chat','shield'] as const)[index]} size={18}/></span>{item}</li>)}</ul></div><p className="auth-footnote"><Icon name="lock" size={14}/>{pt.mfaNotice}</p></section>

@@ -1,4 +1,4 @@
-# ADR 0003 — Detalhes da fundação F2
+# ADR 0003 · Detalhes da fundação F2
 
 Data: 31/10/2026. Status: implementado localmente, submetido ao gate F2.
 

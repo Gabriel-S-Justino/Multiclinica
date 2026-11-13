@@ -1,6 +1,6 @@
 # Conversa determinística
 
-RF-CV-01–05; RF-WA-03–10. Cada evento usa estado/versionamento persistido, contexto mínimo validado por schema e ações de domínio autorizadas.
+RF-CV-01-05; RF-WA-03-10. Cada evento usa estado/versionamento persistido, contexto mínimo validado por schema e ações de domínio autorizadas.
 
 | Estado | Entrada válida | Próximo estado / efeito |
 |---|---|---|
@@ -26,6 +26,6 @@ Deduplicar envelope e cada mensagem por identificador autenticado. Criar sequên
 
 Durante handoff o bot fica silencioso. Atendente deve assumir com compare-and-swap para impedir dois responsáveis; acesso por fila e clínica. Fora do horário registra solicitação; só informa prazo previamente configurado. Mídia fora de handoff recebe orientação de texto/humano sem download.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.

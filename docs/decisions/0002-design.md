@@ -1,6 +1,6 @@
-# ADR 0002 — Desenho para a fundação
+# ADR 0002 · Desenho para a fundação
 
-Data: 31/10/2026. Histórico: proposto na F1 e aprovado pelo usuário para F2 em 31/10/2026. D1–D16 continuam como base aprovada na F0, com valores pendentes preservados. Detalhes da fundação e desvios limitados estão no ADR 0003.
+Data: 31/10/2026. Histórico: proposto na F1 e aprovado pelo usuário para F2 em 31/10/2026. D1-D16 continuam como base aprovada na F0, com valores pendentes preservados. Detalhes da fundação e desvios limitados estão no ADR 0003.
 
 ## Persistência e isolamento
 
@@ -17,7 +17,7 @@ Adotar RLS como segunda barreira, além de filtros explícitos de tenant e autor
 - `LeastFutureLoad`: janela proposta da data de consulta até o fim da janela pesquisada; somar duração de scheduled/confirmed, desempatar pelo primeiro slot e UUID estável. Validar a regra com a clínica antes de F3.
 - Recursos no MVP têm capacidade unitária. Capacidade maior é modelada como sub-recursos individualmente reserváveis; não usar soma não serializada. Confirmar necessidade real com a clínica.
 
-## Filas — D6 ainda em aberto
+## Filas · D6 ainda em aberto
 
 | Opção | Custo | Latência | Operação e riscos |
 |---|---|---|---|

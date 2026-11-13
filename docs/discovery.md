@@ -1,4 +1,4 @@
-# F0 — Descoberta
+# F0 · Descoberta
 
 Data: 31/10/2026. Fonte: `Master.md`, fornecido pelo usuário e lido nesta sessão. O documento define o escopo; esta fase não implementa a aplicação.
 
@@ -20,7 +20,7 @@ Estado inicial verificado: repositório com apenas README, branch `main`, remoto
 
 | Pergunta | Proposta / consequência | Prazo |
 |---|---|---|
-| Os padrões D1–D16 podem orientar o design? | Ver ADR; todos aguardam confirmação | Gate F0 |
+| Os padrões D1-D16 podem orientar o design? | Ver ADR; todos aguardam confirmação | Gate F0 |
 | Qual clínica piloto e quem valida regras e textos? | Responsáveis operacional e clínico a indicar | Antes de validar fluxos |
 | Quais campos mínimos identificam paciente e autorizam dependentes? | Telefone identifica contato; nascimento sozinho não deve ser tratado como prova forte. Definir verificação proporcional e recuperação por humano | Antes de F3 |
 | Quais antecedências, durações, intervalos e limites de remarcação? | Parametrizar; sem regras clínicas inventadas | Antes de F3 |

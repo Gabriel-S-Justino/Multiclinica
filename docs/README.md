@@ -1,6 +1,6 @@
 # Documentação técnica
 
-F0–F4 aprovadas em 31/10/2026. Documentos de design preservam o plano completo; a base entregue está em [foundation.md](foundation.md) e o motor F3 em [scheduling-implementation.md](scheduling-implementation.md). Ainda sem MVP completo ou deploy.
+O [portal atual](https://multclinicai.vercel.app) atende demonstração e treinamento. Comece pelo [roteiro de implantação](integration-onboarding.md) e pelos [critérios de produção](release-runbook.md). Relatórios e decisões das fases iniciais são registros históricos.
 
 | Documento | Conteúdo |
 |---|---|
@@ -12,18 +12,18 @@ F0–F4 aprovadas em 31/10/2026. Documentos de design preservam o plano completo
 | [Dados](data-model.md) | Entidades, vínculos e constraints |
 | [Agendamento](scheduling.md) | Disponibilidade e transações |
 | [Conversa](whatsapp-flow.md) | Estados e eventos |
-| [Permissões](users-and-permissions.md) | RBAC e break-glass |
-| [API](api.md) | Contratos propostos |
+| [Permissões](users-and-permissions.md) | Cargos e permissões por vínculo |
+| [API](api.md) | Contratos e referência OpenAPI |
 | [Segurança](security.md) | STRIDE e controles |
 | [IA](ai-provider-setup.md) | Interfaces e guardrails |
 | [WhatsApp](whatsapp-provider-setup.md) | Fronteira de integração |
 | [LGPD](lgpd.md) | Pendências e ciclo de dados |
 | [Deploy](deployment-vercel-neon.md) | Restrições e fontes verificadas |
 | [Testes](testing.md) | Critérios e rastreabilidade |
-| [Operação](operations.md) | Runbooks propostos |
+| [Operação](operations.md) | Operação e recuperação |
 
-Execução local: seguir [fundação](foundation.md). Revisão dos documentos não exige credenciais. Não confundir funcionalidades planejadas com endpoints entregues nesta fase.
+Execução local: seguir [fundação](foundation.md). Para rotas vigentes, consulte o OpenAPI.
 
 ## Continuidade autorizada
 
-Ver [relatório F5–F8](reports/continuation-f5-f8.md), [mensageria](messaging-implementation.md), [privacidade/incidentes](privacy-operations.md), [release](release-runbook.md) e [OpenAPI](api/openapi.json). Validação local não equivale a deploy ou conformidade final.
+Ver [relatório F5-F8](reports/continuation-f5-f8.md), [mensageria](messaging-implementation.md), [privacidade/incidentes](privacy-operations.md), [release](release-runbook.md) e [OpenAPI](api/openapi.json). Validação local não equivale a deploy ou conformidade final.

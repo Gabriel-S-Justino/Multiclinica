@@ -1,9 +1,11 @@
-# Prompt Mestre v2 — Plataforma de Atendimento e Agendamento Clínico via WhatsApp
+# Prompt Mestre v2 · Plataforma de Atendimento e Agendamento Clínico via WhatsApp
+
+Este documento registra o desenho original. Consulte o [índice técnico](README.md) e o [roteiro de release](release-runbook.md) para a operação vigente.
 
 ## 0. Como executar este prompt
 
 - A execução é feita em **fases com gates** (seção 15). Ao final de cada fase, pare, apresente o relatório da fase (seção 16.2) e aguarde aprovação antes de avançar. Não tente entregar tudo em uma única resposta.
-- Em modo não interativo (sem humano para responder), não fique bloqueado: adote o **padrão proposto** de cada decisão pendente (seção 3), registre como ADR em `docs/decisions/` com status "assumida — pendente de confirmação" e avance apenas nas partes independentes.
+- Em modo não interativo (sem humano para responder), não fique bloqueado: adote o **padrão proposto** de cada decisão pendente (seção 3), registre como ADR em `docs/decisions/` com status "assumida · pendente de confirmação" e avance apenas nas partes independentes.
 - **Precedência em caso de conflito entre requisitos:** (1) segurança e privacidade dos pacientes; (2) integridade dos dados (sem dupla reserva, sem operação duplicada); (3) simplicidade operacional; (4) conveniência de UX; (5) velocidade de entrega. Se encontrar contradição neste documento, registre-a e proponha a resolução antes de implementar.
 - **Fatos externos** (APIs, limites, preços, versões suportadas, políticas do WhatsApp, runtime da Vercel, recursos da Neon) devem ser verificados na documentação oficial vigente no momento da implementação. Cite fonte e data de consulta em `docs/`. O que não puder ser verificado deve ser marcado como "não verificado"; não presuma.
 - **Evidência:** nada pode ser declarado "concluído", "testado", "seguro" ou "pronto" sem saída de comando, relatório de teste ou referência a arquivo/linha.
@@ -72,7 +74,7 @@ Apresente estas decisões na Fase 0. Se não houver resposta, aplique o padrão 
 | D8 | Distribuição sem preferência de profissional | Estratégia `LeastFutureLoad` (ver RF-AG-06), intercambiável | Fase 3 |
 | D9 | Políticas de cancelamento/remarcação | Parâmetros por serviço: antecedência mínima, limite de remarcações; sem cobrança no MVP | Fase 3 |
 | D10 | Escopo clínico do bot | Apenas agenda e encaminha; não dá orientação clínica (RF-IA-08) | Fase 6 |
-| D11 | Convênio e preço | Fora do MVP; o bot não informa preços | — |
+| D11 | Convênio e preço | Fora do MVP; o bot não informa preços | · |
 | D12 | Retenção e descarte de mensagens | Configurável por clínica; padrão definido com jurídico; criptografia de campo para conteúdo de mensagens | Fase 7 |
 | D13 | Provedor de IA, contrato e região | Contrato/DPA com retenção mínima ou zero e avaliação de transferência internacional de dados (LGPD) antes de produção | Fase 6 |
 | D14 | Mídia recebida | MVP: responder que só há suporte a texto e oferecer atendimento humano | Fase 5 |
@@ -329,22 +331,22 @@ Unitários para domínio, integração para banco/API, e2e para fluxos críticos
 
 `docs/` em Markdown, atualizada **a cada fase**, no mínimo:
 
-- `README.md` — visão geral, arquitetura e execução local;
-- `architecture.md` — componentes, camadas, decisões e diagramas;
-- `decisions/` — ADRs (inclui decisões D1–D16, com status);
-- `requirements.md` — requisitos com IDs e rastreabilidade para testes;
-- `whatsapp-flow.md` — fluxo conversacional, estados e transições;
-- `scheduling.md` — disponibilidade, holds, conflitos, remarcação e status;
-- `users-and-permissions.md` — perfis, RBAC, matriz de permissões, break-glass e isolamento multi-tenant;
-- `data-model.md` — entidades, relacionamentos, índices e constraints;
-- `api.md` — endpoints, schemas e erros;
-- `ai-provider-setup.md` — provedores, variáveis, troca de modelo, guardrails e cotas;
-- `whatsapp-provider-setup.md` — webhook, assinatura, janelas, templates e opt-in/out;
-- `security.md` — threat model (STRIDE), controles e checklist;
-- `lgpd.md` — dados tratados, finalidades, base legal, retenção, direitos, operadores e transferência internacional;
-- `deployment-vercel-neon.md` — deploy, variáveis, banco, migrações e limites verificados;
-- `testing.md` — execução, estratégia e relatório;
-- `operations.md` — logs, métricas, alertas, backup/restauração e resposta a incidentes (runbooks).
+- `README.md` · visão geral, arquitetura e execução local;
+- `architecture.md` · componentes, camadas, decisões e diagramas;
+- `decisions/` · ADRs (inclui decisões D1-D16, com status);
+- `requirements.md` · requisitos com IDs e rastreabilidade para testes;
+- `whatsapp-flow.md` · fluxo conversacional, estados e transições;
+- `scheduling.md` · disponibilidade, holds, conflitos, remarcação e status;
+- `users-and-permissions.md` · perfis, RBAC, matriz de permissões, break-glass e isolamento multi-tenant;
+- `data-model.md` · entidades, relacionamentos, índices e constraints;
+- `api.md` · endpoints, schemas e erros;
+- `ai-provider-setup.md` · provedores, variáveis, troca de modelo, guardrails e cotas;
+- `whatsapp-provider-setup.md` · webhook, assinatura, janelas, templates e opt-in/out;
+- `security.md` · threat model (STRIDE), controles e checklist;
+- `lgpd.md` · dados tratados, finalidades, base legal, retenção, direitos, operadores e transferência internacional;
+- `deployment-vercel-neon.md` · deploy, variáveis, banco, migrações e limites verificados;
+- `testing.md` · execução, estratégia e relatório;
+- `operations.md` · logs, métricas, alertas, backup/restauração e resposta a incidentes (runbooks).
 
 Documente decisões e limitações reais. Sem credenciais ou dados reais.
 
@@ -354,7 +356,7 @@ Cada fase termina com: código + testes + documentação atualizados, comandos e
 
 | Fase | Conteúdo | Saída principal |
 |---|---|---|
-| **F0 Descoberta** | Ambiguidades, premissas, perguntas bloqueantes, decisões D1–D16, NFRs, escopo | Lista de perguntas e ADRs de decisão |
+| **F0 Descoberta** | Ambiguidades, premissas, perguntas bloqueantes, decisões D1-D16, NFRs, escopo | Lista de perguntas e ADRs de decisão |
 | **F1 Design** | Arquitetura, fluxos, estados, modelo de dados, threat model STRIDE, matriz de permissões, contratos de API e interfaces de provedores | Documentos de design e diagramas |
 | **F2 Fundação** | Repositório, CI, lint/type/test/SAST, configuração validada, logs base, migrações iniciais, autenticação, RBAC, isolamento multi-tenant (e RLS, se aprovada) | Testes de isolamento e permissão passando |
 | **F3 Agendamento** | Agendas, disponibilidade, holds, agendamentos, status, idempotência, concorrência | Testes de concorrência em PostgreSQL real |

@@ -19,11 +19,11 @@ Criptografia proposta: AEAD com nonce único e associated data contendo tenant/t
 
 Riscos residuais: prova de identidade e autorização de dependentes ainda não aprovadas; fornecedor com entrega ambígua pode duplicar mensagem; nenhum teste elimina todos os riscos de IA; políticas legais/backup/retentivas ainda pendentes. Scans sem achados não equivalem a certificação.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
 
 
-## Atualização F3 — 31/10/2026
+## Atualização F3 · 31/10/2026
 
 A F3 acrescenta exclusão de intervalos, triggers/locks transacionais, search_path fixo em funções, RLS nas novas entidades, cifra AEAD vinculada ao tenant e validação independente dos casos de uso. Ver [evidências F3](reports/f3-scheduling.md). Não representa certificação ou teste de produção.

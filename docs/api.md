@@ -1,4 +1,6 @@
-# Contratos de API propostos
+# Contratos históricos da API
+
+A referência vigente está em [OpenAPI](api/openapi.json). Consulte [permissões](users-and-permissions.md) para o modelo atual.
 
 Contratos alvo F1. Na F2 estão executáveis autenticação/MFA/sessão/seleção de clínica/logout/recuperação, leitura de profissionais e auditoria, health e ready; OpenAPI efetivo em `/openapi.json`. Demais rotas da tabela permanecem planejadas. Base `/v1`; JSON com campos extras proibidos em comandos sensíveis. IDs UUID; normalização clínica será implementada com cada caso de uso. Tenant nunca vem de body/query: sessão ativa ou roteamento autenticado de integração.
 
@@ -37,17 +39,17 @@ Criação de membership, atribuição de papéis/filas/profissionais, exceções
 
 ## Schemas e limites propostos
 
-`AppointmentCreate`: hold_id UUID, patient_id XOR new_patient, sem tenant/status escolhido pelo cliente. `new_patient`: display_name até 120 caracteres, birth_date somente se exigida; campos adicionais somente após política. CPF não coletado por padrão. `HoldCreate`: token de slot validado no servidor, sem duração livre. Mensagem de portal: 1–4.000 caracteres (limite interno proposto, não afirmação de limite WhatsApp). Página padrão 25, máximo 100; janelas de agenda até 31 dias; body interno até 64 KiB, webhook com limite próprio a verificar. UTC e fuso são revalidados, nunca confiar no token de slot como garantia.
+`AppointmentCreate`: hold_id UUID, patient_id XOR new_patient, sem tenant/status escolhido pelo cliente. `new_patient`: display_name até 120 caracteres, birth_date somente se exigida; campos adicionais somente após política. CPF não coletado por padrão. `HoldCreate`: token de slot validado no servidor, sem duração livre. Mensagem de portal: 1-4.000 caracteres (limite interno proposto, não afirmação de limite WhatsApp). Página padrão 25, máximo 100; janelas de agenda até 31 dias; body interno até 64 KiB, webhook com limite próprio a verificar. UTC e fuso são revalidados, nunca confiar no token de slot como garantia.
 
 `Idempotency-Key` obrigatório em comandos de negócio repetíveis: hash do payload canônico + tenant/ator/operação; chave repetida com payload diferente → 409. Resultado e efeitos confirmados no mesmo commit. TTL precisa cobrir janela de retries do provedor, a verificar em F5; expiração não remove unicidade dos eventos externos.
 
 Erros: `{error:{code,message,correlation_id,fields?}}`, sem PII/stack trace. 401 sessão ausente; 403 ação negada; 404 recurso ausente ou fora do escopo; 409 conflito/versão/hold expirado; 422 formato inválido; 429 limite; 503 dependência indisponível. Login/recuperação e contato não verificado usam respostas uniformes. Paginação por cursor assinado/escopado e ordenação allowlisted. Respostas sensíveis `Cache-Control: no-store`.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.
 
 
-## Atualização F3 — 31/10/2026
+## Atualização F3 · 31/10/2026
 
 A F3 entrega contratos tipados e casos de uso internos, não novas rotas HTTP. Endpoints/telas de agenda permanecem para F4. Os comandos rejeitam tenant livre, limitam payloads e exigem versão/idempotência. Ver [contratos F3](scheduling-implementation.md).

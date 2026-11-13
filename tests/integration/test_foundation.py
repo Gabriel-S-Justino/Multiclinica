@@ -211,9 +211,10 @@ def test_mfa_cookie_flags_replay_and_audit_permission(foundation):
         "/v1/auth/login", json={"login": "admin@test.invalid", "password": password}, headers=origin
     ).json()["challenge"]
     assert client.get("/v1/auth/session").status_code == 401
+    original_code = pyotp.TOTP(secret).now()
     result = client.post(
         "/v1/auth/mfa/verify",
-        json={"challenge": challenge, "code": pyotp.TOTP(secret).now()},
+        json={"challenge": challenge, "code": original_code},
         headers=origin,
     )
     assert result.status_code == 200, result.text
@@ -247,7 +248,7 @@ def test_mfa_cookie_flags_replay_and_audit_permission(foundation):
     assert (
         client.post(
             "/v1/auth/mfa/verify",
-            json={"challenge": challenge2, "code": pyotp.TOTP(secret).now()},
+            json={"challenge": challenge2, "code": original_code},
             headers=origin,
         ).status_code
         == 401

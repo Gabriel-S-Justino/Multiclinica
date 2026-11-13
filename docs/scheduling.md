@@ -1,6 +1,6 @@
 # Design de agendamento
 
-RF-AG-01–13. Este é o desenho F1; a implementação e os testes F3 estão em [scheduling-implementation.md](scheduling-implementation.md). A granularidade de lock por profissional descrita abaixo foi substituída por lock transacional por clínica no ADR 0004.
+RF-AG-01-13. Este é o desenho F1; a implementação e os testes F3 estão em [scheduling-implementation.md](scheduling-implementation.md). A granularidade de lock por profissional descrita abaixo foi substituída por lock transacional por clínica no ADR 0004.
 
 Disponibilidade é calculada por timezone IANA da clínica, expediente e vigência, exceções, feriados, bloqueios, habilitação e atividade, duração e buffers, antecedências e janela (30 dias por padrão, limitada pela clínica). Intervalos ocupados são `[start,end)`, permitindo slots adjacentes. Datas locais ambíguas/inexistentes por mudança de fuso precisam de resolução explícita; rejeitar entrada ambígua sem offset. Persistir UTC e timezone aplicado. Alterar agenda usa os mesmos locks de ocupação para não invalidar confirmação concorrente.
 
@@ -21,6 +21,6 @@ Todos os escritores de agenda, bloqueios, holds e recursos seguem a mesma ordem 
 
 Recursos têm slots unitários; reservas com múltiplos recursos são all-or-nothing. Exclusion constraints de appointments não protegem contra holds de outra tabela: por isso todos os caminhos passam por locks e revalidação. Testes devem tentar também escrita direta com papel runtime; privilégios/repositórios precisam impedir caminhos não autorizados.
 
-## Atualização F2 — 31/10/2026
+## Atualização F2 · 31/10/2026
 
 Este documento conserva o design completo da F1. O subconjunto implementado e validado nesta fase, com limites e comandos, está em [foundation.md](foundation.md) e no [relatório F2](reports/f2-foundation.md). Funcionalidades futuras aqui descritas não foram declaradas implementadas.

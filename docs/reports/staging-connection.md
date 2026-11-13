@@ -1,5 +1,7 @@
 # Verificação de conexão para staging
 
+Registro histórico. O estado vigente está no [guia de implantação](../integration-onboarding.md) e nas [permissões atuais](../users-and-permissions.md).
+
 31/10/2026. O usuário informou a conclusão da instalação dos plugins. A consulta confirmou Neon e Vercel instalados. Nenhuma ferramenta MCP de acesso às contas foi disponibilizada nesta sessão; foi preparada a alternativa por CLI local, dentro de `.tools/`, ignorada pelo Git.
 
 - Vercel CLI 65.9.0: `whoami --non-interactive --json` retornou `loggedIn: false`, `linkedProject: null`.
