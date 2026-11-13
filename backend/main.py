@@ -4,6 +4,7 @@ import hmac
 import json
 import logging
 import time
+import traceback
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import Engine, select, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.application import auth, invitations, portal
@@ -160,8 +161,27 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
                 request._body = bytes(body)
                 try:
                     response = await call_next(request)
-                except Exception:
+                except Exception as exc:
                     # Do not log exception strings: drivers/providers may include secrets.
+                    logger.error(
+                        json.dumps(
+                            {
+                                "correlation_id": request.state.correlation_id,
+                                "exception_type": type(exc).__name__,
+                                "frames": [
+                                    frame.name for frame in traceback.extract_tb(exc.__traceback__)
+                                ][-14:],
+                                "driver_error_type": (
+                                    type(exc.orig).__name__ if isinstance(exc, DBAPIError) else None
+                                ),
+                                "sqlstate": (
+                                    getattr(exc.orig, "sqlstate", None)
+                                    if isinstance(exc, DBAPIError)
+                                    else None
+                                ),
+                            }
+                        )
+                    )
                     response = JSONResponse(
                         {
                             "error": {
