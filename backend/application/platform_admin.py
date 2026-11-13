@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, func, literal, select, text, union_all
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import aliased
 
 from backend.application.auth import revoke_user_sessions
@@ -16,10 +17,13 @@ from backend.application.portal_commands import (
     InvitationDraft,
     MembershipDraft,
     PlatformInvitationDraft,
+    PlatformUserPhoto,
+    PlatformUserProfile,
     PlatformUserStatus,
     TenantDraft,
     Versioned,
 )
+from backend.application.profile_photo import decode_profile_photo
 from backend.application.scheduling_commands import Mutation
 from backend.infrastructure.db import set_tenant
 from backend.infrastructure.fields import seal, unseal
@@ -214,8 +218,25 @@ class PlatformAdmin:
         self.operator()
         filters = {"limit": limit, "search": search}
         offset = offset_for(self.ctx, cursor, "platform-users", filters)
+        memberships = (
+            select(Membership, Tenant.name, Tenant.active.label("tenant_active"))
+            .join(Tenant, Tenant.id == Membership.tenant_id)
+            .where(
+                Membership.deleted_at.is_(None),
+                Membership.role.in_(("admin", "reception", "collaborator")),
+                Tenant.deleted_at.is_(None),
+                Tenant.internal.is_(False),
+            )
+        )
         statement = (
-            select(User.id, User.login, User.active, UserProfile.details, PlatformOperator.active)
+            select(
+                User.id,
+                User.login,
+                User.active,
+                UserProfile.details,
+                PlatformOperator.active,
+                UserProfile.photo.is_not(None).label("has_photo"),
+            )
             .outerjoin(UserProfile, UserProfile.user_id == User.id)
             .outerjoin(PlatformOperator, PlatformOperator.user_id == User.id)
             .where(User.is_service.is_(False), User.deleted_at.is_(None))
@@ -224,8 +245,28 @@ class PlatformAdmin:
             statement = statement.where(
                 User.login.icontains(search, autoescape=True)
                 | UserProfile.details["full_name"].astext.icontains(search, autoescape=True)
+                | UserProfile.details["email"].astext.icontains(search, autoescape=True)
+                | memberships.where(
+                    Membership.user_id == User.id, Tenant.name.icontains(search, autoescape=True)
+                ).exists()
             )
         rows = self.db.execute(statement.order_by(User.login).offset(offset).limit(limit + 1)).all()
+        by_user: dict[UUID, list[dict[str, Any]]] = {}
+        for membership, name, active in self.db.execute(
+            memberships.where(Membership.user_id.in_([row.id for row in rows[:limit]])).order_by(
+                Tenant.name, Tenant.id
+            )
+        ):
+            by_user.setdefault(membership.user_id, []).append(
+                {
+                    "id": str(membership.id),
+                    "tenant_id": str(membership.tenant_id),
+                    "tenant_name": name,
+                    "tenant_active": active,
+                    "role": membership.role,
+                    "active": membership.active,
+                }
+            )
         return {
             "items": [
                 {
@@ -234,20 +275,83 @@ class PlatformAdmin:
                     "active": active,
                     "details": details,
                     "platform_operator": bool(operator),
+                    "has_photo": has_photo,
+                    "memberships": by_user.get(user_id, []),
                 }
-                for user_id, login, active, details, operator in rows[:limit]
+                for user_id, login, active, details, operator, has_photo in rows[:limit]
             ],
             "next_cursor": cursor_for(
                 self.ctx, offset + limit if len(rows) > limit else None, "platform-users", filters
             ),
         }
 
-    def clinic_permissions(self, tenant_id: UUID, limit: int, cursor: str | None) -> dict[str, Any]:
+    def account(self, user_id: UUID) -> User:
+        user = self.db.get(User, user_id)
+        if user is None or user.deleted_at is not None or user.is_service:
+            raise PortalError()
+        return user
+
+    def save_user_profile(self, command: PlatformUserProfile, user_id: UUID) -> dict[str, Any]:
+        self.operator(write=True)
+        replay = self.ctx.replay("user.profile", command, user_id)
+        if replay is not None:
+            return replay
+        user = self.account(user_id)
+        login = command.login.lower()
+        if login != user.login:
+            if self.db.scalar(select(User.id).where(User.login == login)) is not None:
+                raise PortalError("platform_login_exists", 409)
+            changed = self.db.scalar(
+                text("SELECT public.set_platform_user_login(:id, :login)"),
+                {"id": user_id, "login": login},
+            )
+            if not changed:
+                raise PortalError("permission_denied", 403)
+            if user_id != self.ctx.identity.user_id:
+                revoke_user_sessions(self.db, user_id)
+        details = command.details.model_dump() if command.details is not None else None
+        if details is not None:
+            self.db.execute(
+                insert(UserProfile)
+                .values(user_id=user_id, details=details)
+                .on_conflict_do_update(
+                    index_elements=[UserProfile.user_id], set_={"details": details}
+                )
+            )
+        self.audit(None, "user.profile_updated", user_id)
+        return self.ctx.save("user.profile", command, {"id": str(user_id)}, user_id)
+
+    def user_photo(self, user_id: UUID) -> bytes:
         self.operator()
-        filters = {"limit": limit, "clinic": str(tenant_id)}
+        self.account(user_id)
+        photo = self.db.scalar(select(UserProfile.photo).where(UserProfile.user_id == user_id))
+        if not photo:
+            raise PortalError()
+        return photo
+
+    def save_user_photo(self, command: PlatformUserPhoto, user_id: UUID) -> dict[str, Any]:
+        self.operator(write=True)
+        replay = self.ctx.replay("user.photo", command, user_id)
+        if replay is not None:
+            return replay
+        self.account(user_id)
+        photo = decode_profile_photo(command.jpeg)
+        self.db.execute(
+            insert(UserProfile)
+            .values(user_id=user_id, photo=photo)
+            .on_conflict_do_update(index_elements=[UserProfile.user_id], set_={"photo": photo})
+        )
+        self.audit(None, "user.photo_updated", user_id)
+        return self.ctx.save("user.photo", command, {"id": str(user_id)}, user_id)
+
+    def clinic_permissions(
+        self, tenant_id: UUID, limit: int, cursor: str | None, membership_id: UUID | None = None
+    ) -> dict[str, Any]:
+        self.operator()
+        filters = {"limit": limit, "clinic": str(tenant_id), "membership": membership_id}
         offset = offset_for(self.ctx, cursor, "platform-clinic-permissions", filters)
         clinic = self.permissions_context(tenant_id)
-        items = clinic.memberships(limit=limit + 1, offset=offset)
+        items = clinic.memberships(limit=limit + 1, offset=offset, membership_id=membership_id)
         professionals = self.db.execute(
             select(Professional.id, Professional.display_name)
             .where(Professional.tenant_id == tenant_id)

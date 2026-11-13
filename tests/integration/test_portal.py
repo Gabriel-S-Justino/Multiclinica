@@ -760,6 +760,51 @@ def test_platform_operator_registration_is_independent_of_membership_role(portal
     p.call("GET", "/v1/platform/tenants", expected=403)
 
 
+def test_platform_user_records_include_affiliations_and_allow_profile_edits(portal):
+    p = portal
+    target = p.h.ids["reception"]
+    path = f"/v1/platform/users/{target}"
+    details = {
+        "full_name": "Recepção Atualizada",
+        "email": "contato@test.invalid",
+        "phone": "85999990000",
+    }
+    command = p.command(login="updated@test.invalid", details=details)
+    p.login()
+    p.call("PATCH", f"{path}/profile", command, expected=403)
+    p.call("GET", f"{path}/photo", expected=403)
+    p.login("superadmin")
+    p.call(
+        "PATCH",
+        f"{path}/profile",
+        p.command(login="admin@test.invalid", details=None),
+        expected=409,
+    )
+    p.call("PATCH", f"{path}/profile", command, expected=200)
+    p.call("PATCH", f"{path}/profile", command, expected=200)
+    p.call("PUT", f"{path}/photo", p.command(jpeg="/9j//9k="), expected=200)
+    photo = p.call("GET", f"{path}/photo", expected=200)
+    assert photo.headers["content-type"] == "image/jpeg"
+    result = p.call("GET", "/v1/platform/users?search=contato", expected=200).json()["items"]
+    assert len(result) == 1
+    user = result[0]
+    assert user["login"] == "updated@test.invalid" and user["has_photo"]
+    assert user["details"]["full_name"] == details["full_name"]
+    affiliation = user["memberships"][0]
+    assert affiliation["tenant_id"] == str(p.h.ids["tenant"]) and affiliation["role"] == "reception"
+    assert p.call(
+        "GET", f"/v1/platform/users?search={affiliation['tenant_name']}", expected=200
+    ).json()["items"]
+    permissions = p.call(
+        "GET",
+        f"/v1/platform/tenants/{affiliation['tenant_id']}/permissions?membership_id={affiliation['id']}",
+        expected=200,
+    ).json()["items"]
+    assert [row["user_id"] for row in permissions] == [str(target)]
+    p.call("PUT", f"{path}/photo", p.command(jpeg=None), expected=200)
+    p.call("GET", f"{path}/photo", expected=404)
+
+
 def test_superadmin_invites_new_global_operator(portal):
     p = portal
     path = "/v1/platform/operators/invitations"

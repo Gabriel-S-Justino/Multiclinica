@@ -34,7 +34,7 @@ export function ProfileFields({ initial, email }: { initial?: PersonalDetails | 
   </>;
 }
 
-async function profileJpeg(file: File) {
+export async function profileJpeg(file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10_000_000) {
     throw new Error('invalid_photo');
   }

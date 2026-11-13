@@ -13,6 +13,8 @@ O Admin gera convites na clínica ativa. O Superadmin escolhe uma clínica exist
 
 Ao ativar uma conta nova, escaneie o QR Code no aplicativo autenticador e informe no portal o código de seis dígitos gerado pelo aplicativo. Se precisar, abra **Configurar com chave manual** na mesma tela.
 
+Em **Administração da plataforma → Usuários**, as contas aparecem por instituição. Uma pessoa com mais de um vínculo aparece em cada instituição correspondente. Em **Gerenciar cadastro**, o Superadmin pode editar login, dados pessoais e foto. Use **Permissões** no vínculo para ajustar cargo, acesso, profissionais e filas daquela instituição. Os Superadmins aparecem também no grupo da plataforma. Senha e autenticador são gerenciados pelo titular.
+
 A conta do Superadmin exige um registro global de operador ativo e MFA. Após entrar, o Superadmin abre **Administração da plataforma** e pode consultar os indicadores e a auditoria com exportação CSV. A auditoria reúne metadados de eventos da plataforma e das clínicas. Uma conta técnica de mensageria tem acesso limitado às operações de seu canal.
 
 Em **Administração da plataforma → Usuários → Cadastrar Superadmin**, informe um e-mail ainda sem conta no portal e compartilhe o código de ativação com o destinatário. O código vale por 24 horas e pode ser usado uma vez. Em **Ativar conta**, a pessoa convidada usa o mesmo e-mail, preenche os dados pessoais, define a senha e configura o autenticador. A conta é global e fica sem vínculo com clínica. A emissão e a ativação são registradas na auditoria da plataforma.

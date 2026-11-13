@@ -1,5 +1,3 @@
-import base64
-import binascii
 import hmac
 import json
 import logging
@@ -24,6 +22,7 @@ from backend.application import auth, invitations, portal
 from backend.application.identity_details import PersonalDetails
 from backend.application.portal_access import PortalError
 from backend.application.portal_session import capabilities
+from backend.application.profile_photo import decode_profile_photo
 from backend.config import Settings
 from backend.domain.scheduling import SchedulingError
 from backend.infrastructure.db import make_engine, transaction
@@ -441,14 +440,7 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         session: PortalSession = Depends(current),
         db: Session = Depends(db_session, scope="function"),
     ) -> None:
-        photo = None
-        if command.jpeg is not None:
-            try:
-                photo = base64.b64decode(command.jpeg, validate=True)
-            except (ValueError, binascii.Error) as exc:
-                raise PortalError("invalid_photo", 422) from exc
-            if not photo.startswith(b"\xff\xd8\xff") or not photo.endswith(b"\xff\xd9"):
-                raise PortalError("invalid_photo", 422)
+        photo = decode_profile_photo(command.jpeg)
         db.execute(
             insert(UserProfile)
             .values(user_id=session.user_id, photo=photo)

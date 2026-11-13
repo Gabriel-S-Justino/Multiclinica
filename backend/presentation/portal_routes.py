@@ -2,7 +2,7 @@ from datetime import date
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.routing import APIRoute
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,8 @@ from backend.application.portal_commands import (
     InvitationDraft,
     MembershipDraft,
     PlatformInvitationDraft,
+    PlatformUserPhoto,
+    PlatformUserProfile,
     PlatformUserStatus,
     ProfessionalDraft,
     QueueDraft,
@@ -687,14 +689,42 @@ def register_portal_routes(
     ) -> dict[str, Any]:
         return PlatformAdmin(ctx).users(limit, cursor, search.strip())
 
+    @app.patch("/v1/platform/users/{user_id}/profile")
+    def platform_user_profile(
+        user_id: UUID,
+        command: PlatformUserProfile,
+        request: Request,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).save_user_profile(command, user_id)
+
+    @app.get("/v1/platform/users/{user_id}/photo", response_class=Response)
+    def platform_user_photo(
+        user_id: UUID,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> Response:
+        return Response(PlatformAdmin(ctx).user_photo(user_id), media_type="image/jpeg")
+
+    @app.put("/v1/platform/users/{user_id}/photo")
+    def platform_save_user_photo(
+        user_id: UUID,
+        command: PlatformUserPhoto,
+        request: Request,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).save_user_photo(command, user_id)
+
     @app.get("/v1/platform/tenants/{tenant_id}/permissions")
     def platform_clinic_permissions(
         tenant_id: UUID,
         limit: int = Query(50, ge=1, le=100),
         cursor: str | None = Query(None, max_length=2048),
+        membership_id: UUID | None = None,
         ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
-        return PlatformAdmin(ctx).clinic_permissions(tenant_id, limit, cursor)
+        return PlatformAdmin(ctx).clinic_permissions(tenant_id, limit, cursor, membership_id)
 
     @app.patch("/v1/platform/tenants/{tenant_id}/permissions/{membership_id}")
     def platform_save_clinic_permissions(

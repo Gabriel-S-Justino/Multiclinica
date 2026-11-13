@@ -4543,6 +4543,161 @@
         }
       }
     },
+    "/v1/platform/users/{user_id}/profile": {
+      "patch": {
+        "summary": "Platform User Profile",
+        "operationId": "platform_user_profile_v1_platform_users__user_id__profile_patch",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUserProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Platform User Profile V1 Platform Users  User Id  Profile Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/users/{user_id}/photo": {
+      "get": {
+        "summary": "Platform User Photo",
+        "operationId": "platform_user_photo_v1_platform_users__user_id__photo_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Platform Save User Photo",
+        "operationId": "platform_save_user_photo_v1_platform_users__user_id__photo_put",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUserPhoto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Platform Save User Photo V1 Platform Users  User Id  Photo Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/platform/tenants/{tenant_id}/permissions": {
       "get": {
         "summary": "Platform Clinic Permissions",
@@ -4585,6 +4740,23 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "membership_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Membership Id"
             }
           }
         ],
@@ -6347,6 +6519,68 @@
           "login"
         ],
         "title": "PlatformInvitationDraft"
+      },
+      "PlatformUserPhoto": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+            "title": "Idempotency Key"
+          },
+          "jpeg": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jpeg"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "jpeg"
+        ],
+        "title": "PlatformUserPhoto"
+      },
+      "PlatformUserProfile": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+            "title": "Idempotency Key"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "pattern": "^\\S+$",
+            "title": "Login"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonalDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "login",
+          "details"
+        ],
+        "title": "PlatformUserProfile"
       },
       "PlatformUserStatus": {
         "properties": {

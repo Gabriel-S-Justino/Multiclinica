@@ -313,8 +313,10 @@ class ClinicAdmin:
             ),
         }
 
-    def memberships(self, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
-        members = self.db.execute(
+    def memberships(
+        self, *, limit: int = 100, offset: int = 0, membership_id: UUID | None = None
+    ) -> list[dict[str, Any]]:
+        statement = (
             select(Membership, User)
             .join(User, User.id == Membership.user_id)
             .where(
@@ -328,6 +330,9 @@ class ClinicAdmin:
             .offset(offset)
             .limit(limit)
         )
+        if membership_id is not None:
+            statement = statement.where(Membership.id == membership_id)
+        members = self.db.execute(statement)
         return [
             {
                 "id": str(member.id),

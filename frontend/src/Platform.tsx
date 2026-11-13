@@ -4,11 +4,41 @@ import { pt } from './locales';
 import { clinicRoles, Editor, permissionFields, type Field } from './Management';
 import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, useAction, useRemote } from './ui';
 import type { Membership, Page, RecordData } from './types';
-import type { PersonalDetails } from './Profile';
+import { ProfileFields, profileFields, profileJpeg, type PersonalDetails } from './Profile';
 import { PlatformAuditReport, PlatformOverview } from './PlatformReports';
 
 type Clinic = {id:string;name:string;timezone:string;active:boolean;version:number;registration:RecordData|null};
-type PlatformUser = {id:string;login:string;active:boolean;details:PersonalDetails|null;platform_operator:boolean};
+type UserAffiliation = {
+  id:string;tenant_id:string;tenant_name:string;tenant_active:boolean;role:string;active:boolean;
+};
+type PlatformUser = {
+  id:string;login:string;active:boolean;details:PersonalDetails|null;platform_operator:boolean;
+  has_photo:boolean;memberships:UserAffiliation[];
+};
+type UserGroup = {
+  name:string;
+  users:{user:PlatformUser;affiliation?:UserAffiliation}[];
+};
+
+function groupUsers(users: PlatformUser[]) {
+  const institutions = new Map<string, UserGroup>();
+  const operators: UserGroup = {name:'Administração da plataforma', users:[]};
+  const unassigned: UserGroup = {name:'Sem vínculo institucional', users:[]};
+  for (const user of users) {
+    if (user.platform_operator) operators.users.push({user});
+    if (!user.platform_operator && !user.memberships.length) unassigned.users.push({user});
+    for (const affiliation of user.memberships) {
+      const group = institutions.get(affiliation.tenant_id) ?? {name:affiliation.tenant_name, users:[]};
+      group.users.push({user, affiliation});
+      institutions.set(affiliation.tenant_id, group);
+    }
+  }
+  return [
+    ...[...institutions.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')),
+    operators,
+    unassigned,
+  ].filter(group=>group.users.length);
+}
 const states = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
 type PermissionsPage = Page<RecordData> & {
   professionals: {id:string;name:string}[];
@@ -45,10 +75,11 @@ export function Platform({member,userId,section,title}:{
   const [clinicCursor,setClinicCursor]=useState('');
   const [userCursor,setUserCursor]=useState('');
   const [search,setSearch]=useState('');
-  const [selected,setSelected]=useState<PlatformUser|null>(null);
+  const [selectedId,setSelectedId]=useState<string|null>(null);
   const [permissionsClinic,setPermissionsClinic]=useState<Clinic|null>(null);
   const tenants=useRemote<Page<Clinic>>(member,section==='clinics'?`/platform/tenants?limit=50&cursor=${encodeURIComponent(clinicCursor)}`:null);
   const users=useRemote<Page<PlatformUser>>(member,section==='users'?`/platform/users?limit=50&search=${encodeURIComponent(search)}&cursor=${encodeURIComponent(userCursor)}`:null);
+  const selected=users.data?.items.find(user=>user.id===selectedId);
 
   function saveClinic(values:RecordData) {
     const {name,timezone,active,version,...registration}=values;
@@ -83,14 +114,20 @@ export function Platform({member,userId,section,title}:{
       <div className="form-actions">{clinicCursor&&<button className="secondary" onClick={()=>setClinicCursor('')}>Primeira página</button>}
       {tenants.data?.next_cursor&&<button className="secondary" onClick={()=>setClinicCursor(tenants.data.next_cursor??'')}>Próxima página</button>}</div>
     </>}{section==='users'&&<>
-      <Label text="Buscar por nome ou login"><input type="search" maxLength={254} value={search} onChange={event=>{setSearch(event.target.value);setUserCursor('');}}/></Label>
+      <Label text="Buscar por nome, login, e-mail ou instituição"><input type="search" maxLength={254} value={search} onChange={event=>{setSearch(event.target.value);setUserCursor('');}}/></Label>
       {users.isPending?<Loading/>:users.isError?<Failure error={users.error}/>:!users.data.items.length?<Empty icon="user"/>:
-        <div className="record-list">{users.data.items.map(user=><article className="record-card" key={user.id}>
-          <div className="record-main"><div className="record-title"><h2>{user.details?.full_name??user.login}</h2><span className={`badge ${user.active?'active':'inactive'}`}>{user.active?pt.active:pt.inactive}</span></div>
-          {user.details&&<p className="muted">{user.login}</p>}
-          {user.platform_operator&&<p className="muted">Superadmin</p>}</div>
-          <button className="secondary" onClick={()=>{action.clearError();setSelected(user);}}>Ver cadastro</button>
-        </article>)}</div>}
+        <div className="record-list">{groupUsers(users.data.items).map(group=><section className="panel" key={group.users[0].affiliation?.tenant_id ?? group.name}>
+          <h2>{group.name}</h2>
+          <div className="record-list">{group.users.map(({user,affiliation})=><article className="record-card" key={user.id}>
+            <div className="record-main"><div className="record-title"><h3>{user.details?.full_name??user.login}</h3>
+              <span className={`badge ${user.active?'active':'inactive'}`}>{user.active?pt.active:pt.inactive}</span>
+            </div>
+            {user.details&&<p className="muted">{user.login}</p>}
+            {affiliation?<p className="muted">{pt.roles[affiliation.role]}{!affiliation.active?' · Vínculo inativo':''}{!affiliation.tenant_active?' · Instituição inativa':''}</p>:
+              user.platform_operator&&<p className="muted">Superadmin</p>}</div>
+            <button className="secondary" onClick={()=>{action.clearError();setSelectedId(user.id);}}>Gerenciar cadastro</button>
+          </article>)}</div>
+        </section>)}</div>}
       <div className="form-actions">{userCursor&&<button className="secondary" onClick={()=>setUserCursor('')}>Primeira página</button>}
       {users.data?.next_cursor&&<button className="secondary" onClick={()=>setUserCursor(users.data.next_cursor??'')}>Próxima página</button>}</div>
     </>}
@@ -112,18 +149,21 @@ export function Platform({member,userId,section,title}:{
     {code&&<ActivationCode code={code} onClose={()=>setCode('')}
       hint={section==='users'?'Compartilhe o código em particular com o destinatário. Ele poderá ativar a conta na tela de login em até 24 horas.':undefined}/>}
     {permissionsClinic&&<ClinicPermissions clinic={permissionsClinic} member={member} onClose={()=>setPermissionsClinic(null)}/>}
-    {selected&&<UserRecord user={selected} busy={action.busy} action={action} onClose={()=>setSelected(null)}
-      onDelete={selected.id===userId?undefined:()=>void action.run(async()=>{await action.send(`/platform/users/${selected.id}`,{},'DELETE');setSelected(null);},'Usuário excluído.')}
-      onChange={()=>void action.run(async()=>{await action.send(`/platform/users/${selected.id}`,{active:!selected.active},'PATCH');setSelected(null);},pt.saved)}/>}
+    {selected&&<UserRecord key={selected.id} user={selected} member={member} ownAccount={selected.id===userId}
+      onClose={()=>setSelectedId(null)}/>}
   </>;
 }
 
-function ClinicPermissions({clinic,member,onClose}:{clinic:Clinic;member:Membership;onClose:()=>void}) {
+function ClinicPermissions({clinic,member,onClose,membershipId}:{
+  clinic:Pick<Clinic,'id'|'name'>;member:Membership;onClose:()=>void;membershipId?:string;
+}) {
   const action=useAction(member);
   const [cursor,setCursor]=useState('');
   const [editing,setEditing]=useState<RecordData|null>(null);
   const path=`/platform/tenants/${clinic.id}/permissions`;
-  const permissions=useRemote<PermissionsPage>(member,`${path}?cursor=${encodeURIComponent(cursor)}`);
+  const params=new URLSearchParams({cursor});
+  if (membershipId) params.set('membership_id',membershipId);
+  const permissions=useRemote<PermissionsPage>(member,`${path}?${params}`);
   const page=permissions.data;
   if(editing&&page) return <Editor title={`${pt.permissions} · ${String(editing.login)}`} initial={editing}
     action={action} busy={action.busy} onCancel={()=>setEditing(null)}
@@ -151,23 +191,54 @@ function ClinicPermissions({clinic,member,onClose}:{clinic:Clinic;member:Members
   </Modal>;
 }
 
-function UserRecord({user,busy,action,onClose,onChange,onDelete}:{user:PlatformUser;busy:boolean;action:ReturnType<typeof useAction>;onClose:()=>void;onChange:()=>void;onDelete?:()=>void}) {
-  const details=user.details;
-  return <Modal title={details?.full_name??user.login} onClose={onClose}>
-    <Feedback action={action} errorsOnly/>
-    <dl className="review-grid">
-      <dt>Login</dt><dd>{user.login}</dd>
-      <dt>E-mail de contato</dt><dd>{details?.email??'Não informado'}</dd>
-      <dt>Telefone</dt><dd>{details?.phone??'Não informado'}</dd>
-      <dt>Função</dt><dd>{details?.job_title??'Não informado'}</dd>
-      <dt>Registro profissional</dt><dd>{details?.professional_registration??'Não informado'}</dd>
-      <dt>Situação</dt><dd>{user.active?pt.active:pt.inactive}</dd>
-    </dl>
-    {!user.platform_operator&&<ConfirmButton label={user.active?'Desativar acesso':'Reativar acesso'} title={user.active?'Desativar acesso':'Reativar acesso'}
+function UserRecord({user,member,ownAccount,onClose}:{
+  user:PlatformUser;member:Membership;ownAccount:boolean;onClose:()=>void;
+}) {
+  const action=useAction(member);
+  const [affiliation,setAffiliation]=useState<UserAffiliation|null>(null);
+  const [photoRevision,setPhotoRevision]=useState(0);
+  const [editDetails,setEditDetails]=useState(Boolean(user.details));
+  const path=`/platform/users/${user.id}`;
+  async function savePhoto(file:File|null) {
+    await action.run(async()=>{
+      await action.send(`${path}/photo`,{jpeg:file?await profileJpeg(file):null},'PUT');
+      setPhotoRevision(value=>value+1);
+    },pt.saved);
+  }
+  if (affiliation) return <ClinicPermissions clinic={{id:affiliation.tenant_id,name:affiliation.tenant_name}}
+    member={member} membershipId={affiliation.id} onClose={()=>setAffiliation(null)}/>;
+  return <Modal title={user.details?.full_name??user.login} onClose={onClose}>
+    <Feedback action={action}/>
+    <div className="profile-photo">
+      {user.has_photo&&<img src={`/v1${path}/photo?v=${photoRevision}`} alt="Foto do perfil" width={80} height={80}/>}
+      <Label text="Foto do perfil" hint="JPG, PNG ou WebP de até 10 MB">
+        <input type="file" accept="image/jpeg,image/png,image/webp" disabled={action.busy}
+          onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file) void savePhoto(file);}}/>
+      </Label>
+      {user.has_photo&&<button type="button" className="secondary" disabled={action.busy} onClick={()=>void savePhoto(null)}>Remover foto</button>}
+    </div>
+    <form className="form-grid" onSubmit={event=>{
+      event.preventDefault();
+      const form=event.currentTarget;
+      const login=String(new FormData(form).get('login')??'').trim();
+      const details=editDetails?profileFields(form):null;
+      void action.run(()=>action.send(`${path}/profile`,{login,details},'PATCH'),pt.saved);
+    }}>
+      <Label text={pt.login}><input name="login" required minLength={3} maxLength={254} defaultValue={user.login}/></Label>
+      {editDetails?<ProfileFields initial={user.details} email={user.login.includes('@')?user.login:undefined}/>:
+        <button type="button" className="secondary" onClick={()=>setEditDetails(true)}>Preencher dados pessoais</button>}
+      <div className="form-actions wide"><button disabled={action.busy}>{pt.save}</button></div>
+    </form>
+    <h3>Vínculos institucionais</h3>
+    {user.memberships.length?<div className="record-list">{user.memberships.map(link=><div className="record-card" key={link.id}>
+      <div><strong>{link.tenant_name}</strong><p className="muted">{pt.roles[link.role]} · {link.active?pt.active:pt.inactive}</p></div>
+      <button type="button" className="secondary" onClick={()=>setAffiliation(link)}>{pt.permissions}</button>
+    </div>)}</div>:<p className="muted">{user.platform_operator?'Conta global':'Sem vínculo institucional'}</p>}
+    {!ownAccount&&!user.platform_operator&&<ConfirmButton label={user.active?'Desativar acesso':'Reativar acesso'} title={user.active?'Desativar acesso':'Reativar acesso'}
       message={user.active?'A conta perderá acesso a todas as clínicas.':'A conta voltará a acessar seus vínculos ativos.'}
-      busy={busy} onConfirm={onChange}/>}
-    {onDelete&&<ConfirmButton label="Excluir usuário" title="Excluir usuário"
+      busy={action.busy} onConfirm={()=>action.run(()=>action.send(path,{active:!user.active},'PATCH'),pt.saved)}/>}
+    {!ownAccount&&<ConfirmButton label="Excluir usuário" title="Excluir usuário"
       message="A conta será retirada da plataforma e perderá acesso a todas as clínicas. O histórico ficará preservado."
-      busy={busy} onConfirm={onDelete}/>}
+      busy={action.busy} onConfirm={()=>action.run(async()=>{await action.send(path,{},'DELETE');onClose();},'Usuário excluído.')}/>}
   </Modal>;
 }

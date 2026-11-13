@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 
 from backend.application.contracts import Command
-from backend.application.identity_details import ClinicDetails, Email
+from backend.application.identity_details import ClinicDetails, Email, PersonalDetails
 from backend.application.scheduling_commands import Mutation
 from backend.domain.scheduling import utc
 
@@ -257,6 +257,15 @@ class TenantDraft(Versioned):
 
 class PlatformUserStatus(Mutation):
     active: bool
+
+
+class PlatformUserProfile(Mutation):
+    login: str = Field(min_length=3, max_length=254, pattern=r"^\S+$")
+    details: PersonalDetails | None
+
+
+class PlatformUserPhoto(Mutation):
+    jpeg: str | None = Field(max_length=60000)
 
 
 class BreakGlassDecision(Versioned):
