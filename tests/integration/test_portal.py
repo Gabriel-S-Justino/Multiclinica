@@ -11,7 +11,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.fields import unseal
-from backend.infrastructure.models import Membership, PortalSession, Tenant, User
+from backend.infrastructure.models import Membership, PortalSession, User
 from backend.infrastructure.portal_models import (
     ClinicPolicy,
     IntegrationConfig,
@@ -62,7 +62,11 @@ class PortalHarness:
         member = "other_member" if role == "other_user" else f"{role}_member"
         if role == "superadmin":
             current = self.client.get("/v1/auth/session")
-            assert current.json()["active_membership_id"] == str(self.h.ids[member])
+            assert current.json()["platform_access"]
+            assert current.json()["active_membership_id"] is None
+            assert not current.json()["memberships"]
+            self.cookies[role] = dict(self.client.cookies)
+            return
         response = self.client.post(
             "/v1/auth/active-membership",
             json={"membership_id": str(self.h.ids[member])},
@@ -108,7 +112,7 @@ class PortalHarness:
 def portal(foundation, request):
     settings, admin, _, password, client = foundation
     h = request.getfixturevalue("scheduling")
-    h.ids |= {name: uuid4() for name in ("queue", "foreign_queue", "platform_tenant")}
+    h.ids |= {name: uuid4() for name in ("queue", "foreign_queue")}
     secrets = {
         role: pyotp.random_base32()
         for role in ("admin", "reception", "collaborator", "superadmin", "other_user")
@@ -118,9 +122,6 @@ def portal(foundation, request):
             db.get(User, h.ids[role]).mfa_secret = (
                 cipher(settings).encrypt(secret.encode()).decode()
             )
-        db.add(Tenant(id=h.ids["platform_tenant"], name="Plataforma sintética"))
-        db.flush()
-        db.get(Membership, h.ids["superadmin_member"]).tenant_id = h.ids["platform_tenant"]
         db.add(PlatformOperator(user_id=h.ids["superadmin"], active=True))
         db.add(
             ClinicPolicy(
@@ -683,6 +684,46 @@ def test_platform_and_clinic_admin_manage_permissions_with_tenant_scope(portal):
         p.command(**(values | {"version": receipt["version"], "role": "collaborator"})),
         expected=200,
     )
+
+
+def test_platform_audit_and_deletions_are_scoped(portal):
+    p = portal
+    tenant = p.h.ids["tenant"]
+    member = p.h.ids["reception_member"]
+    p.login()
+    p.call("GET", "/v1/platform/audit", expected=403)
+    p.call(
+        "DELETE",
+        f"/v1/team/memberships/{p.h.ids['other_member']}",
+        p.command(version=0),
+        expected=404,
+    )
+    p.call(
+        "DELETE",
+        f"/v1/team/memberships/{p.h.ids['admin_member']}",
+        p.command(version=0),
+        expected=409,
+    )
+    command = p.command(version=0)
+    p.call("DELETE", f"/v1/team/memberships/{member}", command, expected=200)
+    p.call("DELETE", f"/v1/team/memberships/{member}", command, expected=200)
+    assert str(member) not in {
+        row["id"] for row in p.call("GET", "/v1/team/memberships", expected=200).json()["items"]
+    }
+    p.login("superadmin")
+    p.call("GET", "/v1/platform/overview", expected=200)
+    events = p.call(
+        "GET", f"/v1/platform/audit?clinic={tenant}&action=membership.deleted", expected=200
+    ).json()
+    assert [event["resource_id"] for event in events["items"]] == [str(member)]
+    p.call("DELETE", f"/v1/platform/users/{p.h.ids['reception']}", p.command(), expected=200)
+    assert not p.call("GET", "/v1/platform/users?search=reception", expected=200).json()["items"]
+    p.call("DELETE", f"/v1/platform/tenants/{tenant}", p.command(version=0), expected=200)
+    assert str(tenant) not in {
+        row["id"] for row in p.call("GET", "/v1/platform/tenants", expected=200).json()["items"]
+    }
+    p.login()
+    p.call("GET", "/v1/portal/catalog", expected=401)
 
 
 def test_platform_clinic_registration(portal):

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -119,11 +120,20 @@ class PlatformAudit(Base):
     __tablename__ = "platform_audit_logs"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    tenant_id: Mapped[UUID | None] = mapped_column(ForeignKey("tenants.id"))
     action: Mapped[str] = mapped_column(String(80))
     resource_id: Mapped[UUID | None] = mapped_column()
     correlation_id: Mapped[UUID] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PlatformOperation(Base):
+    __tablename__ = "platform_operations"
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    operation: Mapped[str] = mapped_column(String(30))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
 class BreakGlassRequest(ClinicRecord):

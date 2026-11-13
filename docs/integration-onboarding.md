@@ -1,6 +1,6 @@
 # Implantação assistida de uma clínica
 
-Use [o portal Multiclinica](https://multclinicai.vercel.app) para demonstração e treinamento com dados fictícios. Faça a liberação para pacientes conforme o [roteiro de produção](release-runbook.md).
+Cadastre a clínica no portal Multiclinica. Use o ambiente isolado de testes para homologar com dados fictícios. Faça a liberação para pacientes conforme o roteiro de produção. [Portal Multiclinica](https://multclinicai.vercel.app) · [Roteiro de produção](release-runbook.md)
 
 ## Informações da clínica
 

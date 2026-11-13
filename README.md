@@ -1,6 +1,6 @@
 # Multiclinica
 
-Plataforma de agendamento e atendimento para clínicas. O [portal de demonstração](https://multclinicai.vercel.app) está publicado com MFA, cadastro de clínicas, convites, perfis e permissões por vínculo.
+Plataforma de agendamento e atendimento para clínicas. O portal oferece MFA, cadastro de clínicas, convites, perfis e permissões por vínculo. O painel global inclui gestão de clínicas e usuários, indicadores e auditoria exportável. [Portal Multiclinica](https://multclinicai.vercel.app)
 
 Cada clínica configura sua conta do WhatsApp Business e sua chave da OpenAI em **Integrações**, com acompanhamento da equipe Multiclinica. Comece pelo [guia de implantação assistida](docs/integration-onboarding.md) e pelos [critérios de liberação](docs/release-runbook.md).
 

@@ -11,6 +11,8 @@ O login identifica a conta. O vínculo ativo determina a clínica, o cargo e as 
 
 O Admin gera convites na clínica ativa. O Superadmin escolhe uma clínica existente e gera o convite naquela clínica. O destinatário ativa a conta ou aceita com uma conta existente. O vínculo é gravado após o aceite. Alterações de permissões são auditadas, invalidam sessões do vínculo e protegem o último administrador ativo.
 
-A conta do Superadmin precisa de vínculo próprio, operador ativo e MFA. O acesso após o login abre **Administração da plataforma**. O acesso excepcional a agendamentos pelo perfil de plataforma foi removido. Uma conta técnica de mensageria tem acesso limitado às operações de seu canal.
+A conta do Superadmin exige um registro global de operador ativo e MFA. Após entrar, o Superadmin abre **Administração da plataforma** e pode consultar os indicadores e a auditoria com exportação CSV. A auditoria reúne metadados de eventos da plataforma e das clínicas. Uma conta técnica de mensageria tem acesso limitado às operações de seu canal.
+
+O Superadmin pode excluir clínicas e contas de outros usuários. O Admin pode excluir um vínculo da própria clínica. A exclusão revoga acesso, remove o registro da operação e preserva o histórico. O último administrador ativo de uma clínica é protegido contra remoção pelo Admin.
 
 Em **Minha conta**, a pessoa atualiza os dados de contato e a foto. Senhas são protegidas com Argon2id. Sessões usam cookies seguros e mutações verificam CSRF e origem. A API exige MFA recente em operações administrativas sensíveis.

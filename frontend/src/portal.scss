@@ -204,6 +204,14 @@ legend { font-weight: 600; font-size: 13px; padding: 0 6px; }
 .profile-photo { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .profile-photo img { border-radius: 50%; object-fit: cover; }
 .platform-tabs { margin-bottom: 16px; }
+.platform-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.platform-metrics h2 { font-size: 1rem; }
+.platform-metrics strong { font-size: 2rem; }
 .account-role { font-size: 13px; font-weight: 600; margin-right: 6px; white-space: nowrap; }
 .account-button { min-height: 36px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
 .workspace-main > main { width: 100%; max-width: 1640px; margin: 0 auto; padding: 28px 32px 64px; flex: 1; }

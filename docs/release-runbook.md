@@ -1,6 +1,6 @@
 # Release e liberação para produção
 
-O [portal Multiclinica](https://multclinicai.vercel.app) é o endereço atual de demonstração. O [relatório F8](reports/f8-staging.md) registra testes de um ambiente histórico com dados fictícios. Use as evidências do ambiente escolhido para a aprovação de produção.
+O portal Multiclinica está publicado no endereço principal. Use ambiente isolado para testes e registre as evidências do ambiente de destino antes de liberar atendimento a pacientes. [Portal Multiclinica](https://multclinicai.vercel.app) · [Relatório histórico F8](reports/f8-staging.md)
 
 ## Preparação da equipe Multiclinica
 

@@ -124,10 +124,15 @@ def get_session(db: Session, settings: Settings, raw: str | None) -> PortalSessi
 
 def principal(db: Session, session: PortalSession) -> Principal:
     membership = db.get(Membership, session.membership_id) if session.membership_id else None
-    if not membership or not membership.active or membership.user_id != session.user_id:
+    if (
+        not membership
+        or not membership.active
+        or membership.role == "superadmin"
+        or membership.user_id != session.user_id
+    ):
         raise AuthError
     tenant = db.get(Tenant, membership.tenant_id)
-    if not tenant or not tenant.active:
+    if not tenant or not tenant.active or tenant.internal:
         raise AuthError
     set_tenant(db, membership.tenant_id)
     return Principal(
@@ -145,7 +150,15 @@ def rotate_membership(
     db: Session, settings: Settings, session: PortalSession, membership_id: UUID
 ) -> tuple[str, str]:
     membership = db.get(Membership, membership_id)
-    if not membership or membership.user_id != session.user_id or not membership.active:
+    if (
+        not membership
+        or membership.user_id != session.user_id
+        or not membership.active
+        or membership.role == "superadmin"
+    ):
+        raise AuthError
+    tenant = db.get(Tenant, membership.tenant_id)
+    if not tenant or not tenant.active or tenant.internal or tenant.deleted_at is not None:
         raise AuthError
     new_token, csrf = create_session(db, settings, session.user_id, session.mfa_verified)
     db.flush()

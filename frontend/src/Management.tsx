@@ -128,7 +128,14 @@ export function Team({member}: {member:Membership}) {
       {membershipCursor&&<button className="secondary" onClick={()=>setMembershipCursor('')}>Primeira página</button>}
       {members.data?.next_cursor&&<button className="secondary" onClick={()=>setMembershipCursor(members.data.next_cursor??'')}>Próxima página</button>}
     </div>
-    {editMember && <Editor title={`${pt.permissions}: ${String(editMember.login)}`} initial={editMember} busy={action.busy} action={action} fields={permissionFields(
+    {editMember && <Editor title={`${pt.permissions}: ${String(editMember.login)}`} initial={editMember} busy={action.busy} action={action}
+      intro={<ConfirmButton label="Excluir vínculo" title="Excluir usuário da clínica"
+        message="O usuário perderá o acesso a esta clínica. O histórico ficará preservado."
+        busy={action.busy} onConfirm={()=>action.run(async()=>{
+          await action.send(`/team/memberships/${editMember.id}`,{version:editMember.version},'DELETE');
+          setMember(null);
+        },'Vínculo excluído.')}/>}
+      fields={permissionFields(
       professionals.data?.items.map(item=>({value:String(item.id),label:String(item.display_name)})),
       queues.data?.items.map(item=>({value:item.id,label:item.name})),
     )} onCancel={()=>setMember(null)} onSave={values=>void action.run(async()=>{await action.send(`/team/memberships/${editMember.id}`,values,'PATCH');setMember(null);},pt.saved)}/>}

@@ -1,5 +1,5 @@
 export type Membership = { id: string; tenant_id: string; role: string; clinic_name?: string; timezone?: string; capabilities?: string[] };
-export type Session = { user_id: string; active_membership_id: string | null; memberships: Membership[] };
+export type Session = { user_id: string; platform_access?: boolean; active_membership_id: string | null; memberships: Membership[] };
 export type Professional = { id: string; display_name: string; active: boolean };
 export type ServiceOption = { id: string; name: string; active: boolean; policy_validated: boolean; requires_birth_date: boolean; requires_professional: boolean; duration_minutes: number; bookable: boolean };
 export type UnitOption = { id: string; name: string };

@@ -1,6 +1,6 @@
 # Documentação técnica
 
-O [portal atual](https://multclinicai.vercel.app) atende demonstração e treinamento. Comece pelo [roteiro de implantação](integration-onboarding.md) e pelos [critérios de produção](release-runbook.md). Relatórios e decisões das fases iniciais são registros históricos.
+O portal atual está em [Multiclinica](https://multclinicai.vercel.app). Comece pelo [roteiro de implantação](integration-onboarding.md) e pelos [critérios de produção](release-runbook.md). Relatórios e decisões das fases iniciais são registros históricos.
 
 | Documento | Conteúdo |
 |---|---|

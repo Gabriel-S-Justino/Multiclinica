@@ -107,26 +107,6 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             CSRF_COOKIE, csrf, httponly=False, secure=True, samesite="lax", path="/"
         )
 
-    def select_platform_home(db: Session, raw: str) -> None:
-        session = auth.get_session(db, settings, raw)
-        if not session.mfa_verified:
-            return
-        operator = db.get(PlatformOperator, session.user_id)
-        if not operator or not operator.active:
-            return
-        session.membership_id = db.scalar(
-            select(Membership.id)
-            .join(Tenant, Tenant.id == Membership.tenant_id)
-            .where(
-                Membership.user_id == session.user_id,
-                Membership.role == "superadmin",
-                Membership.active.is_(True),
-                Tenant.active.is_(True),
-            )
-            .order_by(Membership.id)
-            .limit(1)
-        )
-
     def login_origin(request: Request) -> None:
         if request.headers.get("origin") != settings.public_origin:
             raise HTTPException(403, "origin_denied")
@@ -318,8 +298,6 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         login_origin(request)
         throttle(request, "mfa", command.challenge)
         raw, csrf = auth.verify_mfa(db, settings, command.challenge, command.code)
-        db.flush()
-        select_platform_home(db, raw)
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
 
@@ -371,14 +349,19 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
                 .where(
                     Membership.user_id == session.user_id,
                     Membership.active.is_(True),
+                    Membership.role != "superadmin",
                     Tenant.active.is_(True),
+                    Tenant.internal.is_(False),
                 )
             )
         )
         operator = db.get(PlatformOperator, session.user_id)
         return {
             "user_id": str(session.user_id),
-            "active_membership_id": str(session.membership_id) if session.membership_id else None,
+            "platform_access": bool(operator and operator.active and session.mfa_verified),
+            "active_membership_id": next(
+                (str(item.id) for item, _ in memberships if item.id == session.membership_id), None
+            ),
             "memberships": [
                 {
                     "id": str(item.id),

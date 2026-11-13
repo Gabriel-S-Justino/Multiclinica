@@ -48,7 +48,9 @@ from backend.application.scheduling_commands import (
     TransitionRequest,
 )
 from backend.config import Settings
+from backend.domain.permissions import Principal
 from backend.infrastructure.models import PortalSession
+from backend.infrastructure.portal_models import PlatformOperator
 from backend.presentation.portal_outputs import (
     AppointmentPage,
     AppointmentView,
@@ -70,8 +72,25 @@ def register_portal_routes(
         session: PortalSession = Depends(session_dependency),
         db: Session = Depends(db_dependency, scope="function"),
     ) -> PortalContext:
+        if session.membership_id is None and db.get(PlatformOperator, session.user_id) is not None:
+            raise PortalError("permission_denied", 403)
         identity = auth.principal(db, session)
         request.state.tenant_id = str(identity.tenant_id)
+        return PortalContext(db, settings, identity, UUID(request.state.correlation_id))
+
+    def platform_context(
+        request: Request,
+        session: PortalSession = Depends(session_dependency),
+        db: Session = Depends(db_dependency, scope="function"),
+    ) -> PortalContext:
+        identity = Principal(
+            session.user_id,
+            UUID(int=0),
+            UUID(int=0),
+            "superadmin",
+            session.mfa_verified,
+            session.authenticated_at,
+        )
         return PortalContext(db, settings, identity, UUID(request.state.correlation_id))
 
     def keyed(request: Request, command: Mutation) -> None:
@@ -155,6 +174,13 @@ def register_portal_routes(
     ) -> dict[str, Any]:
         keyed(request, command)
         return invitations.activation_receipt(settings, ClinicAdmin(ctx).invite(command))
+
+    @app.delete("/v1/team/memberships/{entity_id}")
+    def remove_membership(
+        entity_id: UUID, command: Versioned, request: Request, ctx: PortalContext = Depends(context)
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return ClinicAdmin(ctx).remove_membership(command, entity_id)
 
     @app.get("/v1/auth/invitations")
     def invitations_for_user(
@@ -558,13 +584,52 @@ def register_portal_routes(
     def platform_tenants(
         limit: int = Query(25, ge=1, le=100),
         cursor: str | None = Query(None, max_length=2048),
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         return PlatformAdmin(ctx).tenants(limit, cursor)
 
+    @app.get("/v1/platform/overview")
+    def platform_overview(ctx: PortalContext = Depends(platform_context)) -> dict[str, int]:
+        return PlatformAdmin(ctx).overview()
+
+    @app.get("/v1/platform/audit")
+    def platform_audit(
+        start: date | None = None,
+        end: date | None = None,
+        action: str = Query("", max_length=80),
+        scope: Literal["clinic", "platform"] | None = None,
+        clinic: UUID | None = None,
+        limit: int = Query(50, ge=1, le=500),
+        cursor: str | None = Query(None, max_length=2048),
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        return PlatformAdmin(ctx).audit_events(
+            limit, cursor, start, end, action.strip(), scope, clinic
+        )
+
+    @app.delete("/v1/platform/tenants/{tenant_id}")
+    def delete_clinic(
+        tenant_id: UUID,
+        command: Versioned,
+        request: Request,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).delete_clinic(command, tenant_id)
+
+    @app.delete("/v1/platform/users/{user_id}")
+    def delete_platform_user(
+        user_id: UUID,
+        command: Mutation,
+        request: Request,
+        ctx: PortalContext = Depends(platform_context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return PlatformAdmin(ctx).delete_user(command, user_id)
+
     @app.post("/v1/platform/tenants")
     def create_tenant(
-        command: TenantDraft, request: Request, ctx: PortalContext = Depends(context)
+        command: TenantDraft, request: Request, ctx: PortalContext = Depends(platform_context)
     ) -> dict[str, Any]:
         keyed(request, command)
         return PlatformAdmin(ctx).save_tenant(command)
@@ -574,7 +639,7 @@ def register_portal_routes(
         tenant_id: UUID,
         command: TenantDraft,
         request: Request,
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         keyed(request, command)
         return PlatformAdmin(ctx).save_tenant(command, tenant_id)
@@ -584,7 +649,7 @@ def register_portal_routes(
         tenant_id: UUID,
         command: InvitationDraft,
         request: Request,
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         keyed(request, command)
         return invitations.activation_receipt(
@@ -596,7 +661,7 @@ def register_portal_routes(
         tenant_id: UUID,
         command: InvitationDraft,
         request: Request,
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         keyed(request, command)
         return invitations.activation_receipt(
@@ -608,7 +673,7 @@ def register_portal_routes(
         limit: int = Query(25, ge=1, le=100),
         cursor: str | None = Query(None, max_length=2048),
         search: str = Query("", max_length=254),
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         return PlatformAdmin(ctx).users(limit, cursor, search.strip())
 
@@ -617,7 +682,7 @@ def register_portal_routes(
         tenant_id: UUID,
         limit: int = Query(50, ge=1, le=100),
         cursor: str | None = Query(None, max_length=2048),
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         return PlatformAdmin(ctx).clinic_permissions(tenant_id, limit, cursor)
 
@@ -627,7 +692,7 @@ def register_portal_routes(
         membership_id: UUID,
         command: MembershipDraft,
         request: Request,
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         keyed(request, command)
         return PlatformAdmin(ctx).save_clinic_permissions(tenant_id, membership_id, command)
@@ -637,7 +702,7 @@ def register_portal_routes(
         user_id: UUID,
         command: PlatformUserStatus,
         request: Request,
-        ctx: PortalContext = Depends(context),
+        ctx: PortalContext = Depends(platform_context),
     ) -> dict[str, Any]:
         keyed(request, command)
         return PlatformAdmin(ctx).set_user_status(command, user_id)

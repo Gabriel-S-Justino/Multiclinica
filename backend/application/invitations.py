@@ -180,6 +180,7 @@ def accept_invitation(
         if member.role == "superadmin":
             raise PortalError("permission_denied", 403)
         member.role, member.active, member.can_manage_schedule = row.role, True, False
+        member.deleted_at = None
     row.status = "accepted"
     db.flush()
     db.add(

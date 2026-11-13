@@ -2,11 +2,11 @@ from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from backend.application.pagination import cursor_for, offset_for
 from backend.application.portal import read_professional, visible_professionals
-from backend.application.portal_access import PortalContext, PortalError, command_values
+from backend.application.portal_access import PortalContext, PortalError, command_values, now
 from backend.application.portal_commands import (
     BlockDraft,
     ClinicPolicyDraft,
@@ -321,6 +321,8 @@ class ClinicAdmin:
                 Membership.tenant_id == self.ctx.tenant_id,
                 Membership.role.in_(("admin", "reception", "collaborator")),
                 User.is_service.is_(False),
+                User.deleted_at.is_(None),
+                Membership.deleted_at.is_(None),
             )
             .order_by(User.login)
             .offset(offset)
@@ -361,13 +363,40 @@ class ClinicAdmin:
         self.ctx.admin(write=True)
         return self.update_permissions(command, entity_id)
 
-    def update_permissions(self, command: MembershipDraft, entity_id: UUID) -> dict[str, Any]:
-        replay = self.ctx.replay("membership.save", command, entity_id)
+    def remove_membership(self, command: Versioned, entity_id: UUID) -> dict[str, Any]:
+        self.ctx.admin(write=True)
+        replay = self.ctx.replay("membership.delete", command, entity_id)
+        if replay is not None:
+            return replay
+        row: Membership = self.ctx.entity(Membership, entity_id)
+        if row.role not in {"admin", "reception", "collaborator"}:
+            raise PortalError("permission_denied", 403)
+        self.update_permissions(
+            MembershipDraft(
+                idempotency_key=command.idempotency_key,
+                version=command.version,
+                role=row.role,
+                active=False,
+                can_manage_schedule=False,
+                professional_ids=[],
+                queue_ids=[],
+            ),
+            entity_id,
+            deleting=True,
+        )
+        return self.ctx.save("membership.delete", command, {"id": str(entity_id)}, entity_id)
+
+    def update_permissions(
+        self, command: MembershipDraft, entity_id: UUID, *, deleting: bool = False
+    ) -> dict[str, Any]:
+        replay = None if deleting else self.ctx.replay("membership.save", command, entity_id)
         if replay is not None:
             return replay
         row: Membership = self.ctx.entity(Membership, entity_id)
         user = self.db.get(User, row.user_id)
-        if row.role not in {"admin", "reception", "collaborator"} or not user or user.is_service:
+        if row.deleted_at is not None or not user or user.deleted_at is not None:
+            raise PortalError()
+        if row.role not in {"admin", "reception", "collaborator"} or user.is_service:
             raise PortalError("permission_denied", 403)
         if row.active and row.role == "admin" and (not command.active or command.role != "admin"):
             others = self.db.scalar(
@@ -418,6 +447,20 @@ class ClinicAdmin:
             for value in set(command.queue_ids)
         )
         self.db.execute(delete(PortalSession).where(PortalSession.membership_id == row.id))
+        if deleting:
+            row.deleted_at = now(self.db)
+            self.db.execute(
+                update(Invitation)
+                .where(
+                    Invitation.tenant_id == self.ctx.tenant_id,
+                    Invitation.recipient_hash
+                    == digest(self.ctx.settings, "invite-recipient", user.login.lower()),
+                    Invitation.status == "pending",
+                )
+                .values(status="revoked")
+            )
+            self.ctx.audit("membership.deleted", row.id)
+            return {"id": str(row.id), "version": version}
         self.ctx.audit("membership.permissions_changed", row.id)
         return self.ctx.save(
             "membership.save", command, {"id": str(row.id), "version": version}, entity_id

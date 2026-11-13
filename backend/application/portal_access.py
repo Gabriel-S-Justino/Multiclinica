@@ -13,7 +13,7 @@ from backend.config import Settings
 from backend.domain.permissions import Principal
 from backend.infrastructure.db import set_tenant
 from backend.infrastructure.models import AuditLog, Membership, Tenant, User
-from backend.infrastructure.portal_models import EntityVersion
+from backend.infrastructure.portal_models import EntityVersion, PlatformOperation
 from backend.infrastructure.scheduling_models import IdempotencyRecord
 from backend.infrastructure.security import digest
 
@@ -59,10 +59,14 @@ class PortalContext:
     def tenant_id(self) -> UUID:
         return self.administrative_tenant_id or self.identity.tenant_id
 
+    @property
+    def global_operation(self) -> bool:
+        return self.identity.role == "superadmin" and self.administrative_tenant_id is None
+
     def validate(
         self, *, lock: bool = False, roles: set[str] | None = None, recent: bool = False
     ) -> datetime:
-        if self.administrative_tenant_id is not None:
+        if self.administrative_tenant_id is not None or self.global_operation:
             raise PortalError("permission_denied", 403)
         set_tenant(self.db, self.tenant_id)
         self.db.execute(
@@ -141,10 +145,14 @@ class PortalContext:
     def replay(
         self, operation: str, command: Mutation, target: UUID | str | None = None
     ) -> dict[str, Any] | None:
-        row = self.db.scalar(
-            select(IdempotencyRecord).where(
-                IdempotencyRecord.tenant_id == self.tenant_id,
-                IdempotencyRecord.key == command.idempotency_key,
+        row = (
+            self.db.get(PlatformOperation, command.idempotency_key)
+            if self.global_operation
+            else self.db.scalar(
+                select(IdempotencyRecord).where(
+                    IdempotencyRecord.tenant_id == self.tenant_id,
+                    IdempotencyRecord.key == command.idempotency_key,
+                )
             )
         )
         if row:
@@ -164,14 +172,19 @@ class PortalContext:
         result: dict[str, Any],
         target: UUID | str | None = None,
     ) -> dict[str, Any]:
+        values = dict(
+            key=command.idempotency_key,
+            actor_id=self.identity.user_id,
+            operation=operation,
+            request_hash=self.fingerprint(command, target),
+            result=result,
+        )
         self.db.add(
-            IdempotencyRecord(
+            PlatformOperation(**values)
+            if self.global_operation
+            else IdempotencyRecord(
                 tenant_id=self.tenant_id,
-                key=command.idempotency_key,
-                actor_id=self.identity.user_id,
-                operation=operation,
-                request_hash=self.fingerprint(command, target),
-                result=result,
+                **values,
             )
         )
         self.db.flush()

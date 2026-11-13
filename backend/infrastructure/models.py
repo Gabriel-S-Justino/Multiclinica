@@ -30,6 +30,7 @@ class User(Base):
     mfa_secret: Mapped[str | None] = mapped_column(String(512))
     last_totp_step: Mapped[int] = mapped_column(default=-1)
     is_service: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Tenant(Base):
@@ -39,6 +40,8 @@ class Tenant(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="America/Sao_Paulo")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     version: Mapped[int] = mapped_column(default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    internal: Mapped[bool] = mapped_column(Boolean, default=False)
     registration: Mapped[dict[str, str | None] | None] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite")
     )
@@ -62,6 +65,7 @@ class Membership(Base):
     role: Mapped[str] = mapped_column(String(30))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     can_manage_schedule: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Unit(Base):

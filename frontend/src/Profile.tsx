@@ -59,7 +59,7 @@ async function profileJpeg(file: File) {
   }
 }
 
-export function Profile({ onClose, onPassword }: { onClose: () => void; onPassword: () => void }) {
+export function Profile({ role, onClose, onPassword }: { role: string; onClose: () => void; onPassword: () => void }) {
   const query = useQuery({ queryKey: ['own-profile'], queryFn: () => api<ProfileData>('/auth/profile'), retry: false });
   const action = useAction();
   const [photoRevision, setPhotoRevision] = useState(0);
@@ -94,6 +94,7 @@ export function Profile({ onClose, onPassword }: { onClose: () => void; onPasswo
         </Label>
         {query.data.has_photo && <button type="button" className="secondary" disabled={action.busy} onClick={() => void savePhoto(null)}>Remover foto</button>}
       </div>
+      <p><strong>Tipo de usuário</strong> {role}</p>
       {photoError && <p className="feedback error" role="alert">Escolha uma imagem válida em JPG, PNG ou WebP de até 10 MB.</p>}
       <form className="form-grid" onSubmit={event => {
         event.preventDefault();

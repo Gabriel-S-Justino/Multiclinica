@@ -57,7 +57,9 @@ def main() -> None:
                 active=True,
             )
             db.add(user)
-            if args.command != "provision-user":
+            if args.command == "bootstrap-platform":
+                db.add(PlatformOperator(user_id=user.id, active=True))
+            elif args.command == "bootstrap":
                 tenant = Tenant(id=uuid4(), name=args.tenant_name or "Administração da plataforma")
                 db.add(tenant)
                 db.flush()
@@ -66,12 +68,10 @@ def main() -> None:
                     Membership(
                         tenant_id=tenant.id,
                         user_id=user.id,
-                        role="superadmin" if args.command == "bootstrap-platform" else "admin",
+                        role="admin",
                         active=True,
                     )
                 )
-                if args.command == "bootstrap-platform":
-                    db.add(PlatformOperator(user_id=user.id, active=True))
         else:
             if not user:
                 raise SystemExit("Identidade não encontrada")
