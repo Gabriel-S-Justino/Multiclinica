@@ -3,16 +3,25 @@ import qrcode from 'qrcode-generator';
 import { api } from './api';
 import { pt } from './locales';
 import { ProfileFields, profileFields } from './Profile';
-import { Feedback, Label, Modal, useAction } from './ui';
+import { Feedback, Icon, Label, Modal, useAction } from './ui';
 
 export function ActivationCode({ code, onClose, hint = pt.activationShare }: {
   code: string; onClose: () => void; hint?: string;
 }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try { await navigator.clipboard.writeText(code); setCopied(true); } catch { setCopied(false); }
+  }
   return <Modal title={pt.activationCode} size="narrow" onClose={onClose}>
     <p className="note">{hint}</p>
     <Label text={pt.activationCode}>
-      <input readOnly value={code} onFocus={event => event.target.select()} />
+      <span className="copy-field">
+        <input className="code-display" readOnly value={code} onFocus={event => event.target.select()} />
+        <button type="button" className="secondary" onClick={() => void copy()}><Icon name={copied ? 'check' : 'copy'} size={16} />{copied ? 'Copiado' : 'Copiar'}</button>
+      </span>
     </Label>
+    {copied && <p className="visually-hidden" role="status">Código copiado.</p>}
+    <div className="form-actions"><button type="button" onClick={onClose}>Concluir</button></div>
   </Modal>;
 }
 
@@ -85,31 +94,48 @@ export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => 
 
   return <>
     <Feedback action={action} />
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="activation-form">
       {authenticatorKey ? <>
-        <p className="note">{pt.activationQrHint}</p>
-        <AuthenticatorQr login={login} secret={authenticatorKey} />
-        <details>
-          <summary>{pt.activationManual}</summary>
-          <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
-            <input readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
+        <ol className="steps" aria-label="Etapas da ativação">
+          <li className="done"><span className="step-index" aria-hidden="true"><Icon name="check" size={14} /></span>Convite</li>
+          <li className="current" aria-current="step"><span className="step-index" aria-hidden="true">2</span>Configuração</li>
+        </ol>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">1</span>Conecte o autenticador</legend>
+          <p className="muted">{pt.activationQrHint}</p>
+          <AuthenticatorQr login={login} secret={authenticatorKey} />
+          <details className="manual-key">
+            <summary>{pt.activationManual}</summary>
+            <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
+              <input className="code-display" readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
+            </Label>
+          </details>
+        </fieldset>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">2</span>Seus dados</legend>
+          <ProfileFields email={login.includes('@') ? login.trim() : undefined} />
+        </fieldset>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">3</span>Crie sua senha</legend>
+          <Label text={pt.newPassword} hint={pt.passwordRule}>
+            <input type="password" autoComplete="new-password" minLength={12} maxLength={128}
+              required value={password} onChange={event => setPassword(event.target.value)} />
           </Label>
-        </details>
-        <ProfileFields email={login.includes('@') ? login.trim() : undefined} />
-        <Label text={pt.newPassword} hint={pt.passwordRule}>
-          <input type="password" autoComplete="new-password" minLength={12} maxLength={128}
-            required value={password} onChange={event => setPassword(event.target.value)} />
-        </Label>
-        <Label text={pt.confirmNewPassword}>
-          <input type="password" autoComplete="new-password" minLength={12} maxLength={128}
-            required value={confirmation} onChange={event => setConfirmation(event.target.value)} />
-        </Label>
-        {mismatch && <p role="alert" className="feedback error">{pt.passwordMismatch}</p>}
-        <Label text={pt.code}>
-          <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
-            maxLength={6} required value={code} onChange={event => setCode(event.target.value)} />
-        </Label>
+          <Label text={pt.confirmNewPassword}>
+            <input type="password" autoComplete="new-password" minLength={12} maxLength={128}
+              required value={confirmation} onChange={event => setConfirmation(event.target.value)} />
+          </Label>
+          {mismatch && <p role="alert" className="feedback error">{pt.passwordMismatch}</p>}
+        </fieldset>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">4</span>Confirme o autenticador</legend>
+          <Label text={pt.code} hint="Digite o código de 6 dígitos exibido agora no aplicativo.">
+            <input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
+              maxLength={6} required value={code} onChange={event => setCode(event.target.value)} />
+          </Label>
+        </fieldset>
       </> : <>
+        <p className="note compact">Use o e-mail e o código de ativação recebidos de quem convidou você.</p>
         <Label text={pt.login}>
           <input autoComplete="username" minLength={3} maxLength={254}
             required value={login} onChange={event => setLogin(event.target.value)} />

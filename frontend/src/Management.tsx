@@ -22,7 +22,7 @@ export function permissionFields(professionals?: Option[], queues?: Option[]): F
 }
 
 /** Formulário genérico de cadastro exibido em uma janela modal, com erros de validação no próprio contexto. */
-export function Editor({title, fields, initial, busy, onSave, onCancel, action, timezone, intro}: {title:string; fields:Field[]; initial?:RecordData; busy:boolean; onSave:(values:RecordData)=>void; onCancel:()=>void; action?:ReturnType<typeof useAction>; timezone?:string; intro?:ReactNode}) {
+export function Editor({title, fields, initial, busy, onSave, onCancel, action, timezone, intro, danger}: {title:string; fields:Field[]; initial?:RecordData; busy:boolean; onSave:(values:RecordData)=>void; onCancel:()=>void; action?:ReturnType<typeof useAction>; timezone?:string; intro?:ReactNode; danger?:ReactNode}) {
   const [values,setValues] = useState<Values>(()=>Object.fromEntries(fields.map(field=>{
     const raw = initial?.[field.name] ?? field.initial ?? (field.type==='checkbox'?false:field.type==='multi'?[]:'');
     return [field.name, field.type==='datetime' && typeof raw==='string' && raw ? isoToZoned(raw,timezone) : raw];
@@ -63,7 +63,7 @@ export function Editor({title, fields, initial, busy, onSave, onCancel, action, 
     {action && <Feedback action={action} errorsOnly/>}{intro}
     <form className="editor-form" onSubmit={event=>{event.preventDefault();submit();}}>
       {groups.map((group,index)=><div className="form-group" key={`${group.name??''}:${index}`}>{group.name && <h3 className="group-title">{group.name}</h3>}<div className="form-grid">{group.fields.map(control)}</div></div>)}
-      <div className="form-actions sticky-actions"><button type="button" className="secondary" disabled={busy} onClick={onCancel}>{pt.cancel}</button><button disabled={busy}>{busy?pt.loading:pt.save}</button></div>
+      <div className="form-actions sticky-actions">{danger && <div className="push-left">{danger}</div>}<button type="button" className="secondary" disabled={busy} onClick={onCancel}>{pt.cancel}</button><button disabled={busy}>{busy?pt.loading:pt.save}</button></div>
     </form>
   </Modal>;
 }
@@ -109,7 +109,7 @@ export function Team({member}: {member:Membership}) {
   const [invite,setInvite] = useState(false);
   const [activationCode, setActivationCode] = useState('');
   return <><PageHeader title={pt.team} description={pt.teamDescription}><button className="secondary" onClick={()=>{action.clearError();setInvite(true);}}>{pt.invite}</button><button onClick={()=>{action.clearError();setProfessional({});}}><Icon name="plus" size={16}/>{pt.newProfessional}</button></PageHeader><Feedback action={action}/>
-    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<><p className="note">Clínica: {member.clinic_name}</p><p className="note">{pt.inviteHint}</p></>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:clinicRoles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{
+    {invite && <Editor title={pt.invite} busy={action.busy} action={action} intro={<p className="note"><Icon name="building" size={16}/><span><strong>{member.clinic_name}</strong><br/>{pt.inviteHint}</span></p>} fields={[{name:'login',label:pt.inviteLogin},{name:'role',label:pt.role,type:'select',options:clinicRoles}]} onCancel={()=>setInvite(false)} onSave={values=>void action.run(async()=>{
       const {version:ignored,...payload}=values;
       void ignored;
       const receipt=await action.send<{activation_code:string}>('/team/invitations',payload);
@@ -129,7 +129,7 @@ export function Team({member}: {member:Membership}) {
       {members.data?.next_cursor&&<button className="secondary" onClick={()=>setMembershipCursor(members.data.next_cursor??'')}>Próxima página</button>}
     </div>
     {editMember && <Editor title={`${pt.permissions}: ${String(editMember.login)}`} initial={editMember} busy={action.busy} action={action}
-      intro={<ConfirmButton label="Excluir vínculo" title="Excluir usuário da clínica"
+      danger={<ConfirmButton label="Excluir vínculo" title="Excluir usuário da clínica"
         message="O usuário perderá o acesso a esta clínica. O histórico ficará preservado."
         busy={action.busy} onConfirm={()=>action.run(async()=>{
           await action.send(`/team/memberships/${editMember.id}`,{version:editMember.version},'DELETE');
@@ -169,7 +169,7 @@ export function Schedules({member}: {member:Membership}) {
       const path=`/${paths[editing.kind]}${editing.row.id?`/${editing.row.id}`:''}`;await action.send(path,values,editing.row.id?'PATCH':'POST');setEditing(null);
     },pt.hoursSaved)}/>}
     {professional && (result.isPending?<Loading/>:result.isError?<Failure error={result.error}/>:kinds.map(item=><section className="panel" key={item.kind}><div className="section-heading"><h2>{item.title}</h2>{allowed && <button className="secondary" onClick={()=>{action.clearError();setEditing({kind:item.kind,row:{professional_id:professional}});}}><Icon name="plus" size={16}/>{item.button}</button>}</div>
-      {!result.data?.[item.key].length?<Empty compact/>:<div className="record-list">{result.data[item.key].map(row=>{const text=describe(item.kind,row);return <article className="record-card" key={String(row.id)}><div className="record-main"><h3>{text.title}</h3><p className="muted">{text.detail}</p></div>{allowed && <div className="record-actions">{item.kind!=='block' && <button className="secondary" onClick={()=>{action.clearError();setEditing({kind:item.kind,row});}}>{pt.edit}</button>}<ConfirmButton label={pt.remove} title={pt.removeTitle} message={pt.removeMessage} busy={action.busy} onConfirm={()=>action.run(()=>action.send(`/${paths[item.kind]}/${row.id}`,{version:row.version},'DELETE'),pt.saved)}/></div>}</article>;})}</div>}
+      {!result.data?.[item.key].length?<Empty compact/>:<div className="record-list">{result.data[item.key].map(row=>{const text=describe(item.kind,row);return <article className="record-card" key={String(row.id)}><div className="record-main"><h3 className="capitalize">{text.title}</h3><p className="muted">{text.detail}</p></div>{allowed && <div className="record-actions">{item.kind!=='block' && <button className="secondary" onClick={()=>{action.clearError();setEditing({kind:item.kind,row});}}>{pt.edit}</button>}<ConfirmButton label={pt.remove} title={pt.removeTitle} message={pt.removeMessage} busy={action.busy} onConfirm={()=>action.run(()=>action.send(`/${paths[item.kind]}/${row.id}`,{version:row.version},'DELETE'),pt.saved)}/></div>}</article>;})}</div>}
     </section>))}
   </>;
 }

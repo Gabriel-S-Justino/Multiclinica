@@ -128,6 +128,7 @@ const navigation:{path:string;title:string;icon:IconName;cap:string}[]=[
 const platformHome = '/admin';
 const platformAccount = `${platformHome}/account`;
 const platformTitle = 'Administração da plataforma';
+const platformOption = '__platform';
 const platformNavigation = [
   {path:platformHome, section:'overview', title:'Visão geral', icon:'services'},
   {path:'/admin/clinics', section:'clinics', title:'Clínicas', icon:'building'},
@@ -139,6 +140,7 @@ const platformMember: Membership = {id:'platform',tenant_id:'',role:'superadmin'
 
 function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching,onAccepted}: {session:Session;member?:Membership;onSwitch:(id:string)=>Promise<void>;onLogout:()=>Promise<void>;onPasswordChanged:()=>Promise<unknown>;switching:boolean;onAccepted:()=>Promise<unknown>}) {
   const location=useLocation();
+  const navigate=useNavigate();
   const platformPath=useMatch('/admin/*');
   const legacyPlatformPath=useMatch('/clinics');
   const inPlatform=Boolean(session.platform_access && (platformPath || legacyPlatformPath || !member));
@@ -151,13 +153,12 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
   useEffect(()=>{if(!menuOpen)return;function escape(event:KeyboardEvent){if(event.key==='Escape')setMenuOpen(false);}window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[menuOpen]);
   const role=pt.roles[workspaceMember?.role??'']??(session.memberships.length===1?pt.roles[session.memberships[0].role]:pt.subtitle);
   return <><div className={menuOpen?'workspace menu-open':'workspace'}><a className="skip-link" href="#workspace-content" onClick={event=>{event.preventDefault();document.getElementById('workspace-content')?.focus();}}>{pt.skip}</a>
-    <aside className="sidebar" id="workspace-menu" aria-label={pt.menu}><div className="sidebar-head"><div className="brand-lockup"><span className="brand" aria-hidden="true"><Icon name="plus" size={20}/></span><strong>{pt.title}</strong></div><button type="button" className="icon-button ghost menu-close" aria-label={pt.closeMenu} onClick={()=>setMenuOpen(false)}><Icon name="close"/></button></div>
-    {session.memberships.length>0&&<div className="clinic-select"><Label text={pt.choose}><select aria-label={pt.choose} value={inPlatform?'':session.active_membership_id??''} disabled={switching} onChange={event=>{if(event.target.value)void onSwitch(event.target.value);}}><option value="">{pt.choose}</option>{session.memberships.map((item,index)=><option key={item.id} value={item.id}>{item.clinic_name??`${pt.clinic} ${index+1}`}</option>)}</select></Label></div>}
+    <aside className="sidebar" id="workspace-menu" aria-label={pt.menu}><div className="sidebar-head"><div className="brand-lockup"><span className="brand" aria-hidden="true"><Icon name="plus" size={20}/></span><span className="brand-text"><strong>{pt.title}</strong><small>{inPlatform?pt.platformShort:pt.clinicPortal}</small></span></div><button type="button" className="icon-button ghost menu-close" aria-label={pt.closeMenu} onClick={()=>setMenuOpen(false)}><Icon name="close"/></button></div>
+    {session.memberships.length>0&&<div className="clinic-select"><Label text={pt.choose}><select aria-label={pt.choose} value={inPlatform?platformOption:session.active_membership_id??''} disabled={switching} onChange={event=>{const value=event.target.value;if(value===platformOption)navigate(platformHome);else if(value===session.active_membership_id)navigate('/agenda');else if(value)void onSwitch(value);}}>{!inPlatform&&!session.active_membership_id&&<option value="">{pt.choose}</option>}<optgroup label={pt.clinics}>{session.memberships.map((item,index)=><option key={item.id} value={item.id}>{item.clinic_name??`${pt.clinic} ${index+1}`}</option>)}</optgroup>{session.platform_access&&<optgroup label={pt.administration}><option value={platformOption}>{pt.platformShort}</option></optgroup>}</select></Label></div>}
     {inPlatform?<nav aria-label={platformTitle}>
       {platformNavigation.map(item=><NavLink end to={item.path} key={item.path}><Icon name={item.icon}/>{item.title}</NavLink>)}
     </nav>:<nav aria-label={pt.workspace}>
       {navigation.filter(item=>member?.capabilities?.includes(item.cap)).map(item=><NavLink to={item.path} key={item.path}><Icon name={item.icon}/>{item.title}</NavLink>)}
-      {session.platform_access&&<NavLink to={platformHome}><Icon name="building"/>{platformTitle}</NavLink>}
     </nav>}
     {!inPlatform&&member?.capabilities?.includes('agenda.read')&&<Roster member={member}/>}
   </aside><div className="sidebar-backdrop" aria-hidden="true" onClick={()=>setMenuOpen(false)}/>

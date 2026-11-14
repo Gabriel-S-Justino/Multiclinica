@@ -22,9 +22,10 @@ export const pt = {
   assignedToMe:'Com você', requestHint:'O pedido será analisado pela clínica. O acesso libera apenas a consulta indicada e expira automaticamente.',
   justificationHint:'Mínimo de 12 caracteres. Não inclua dados pessoais.',
   time:'Horário',
+  clinics:'Clínicas', platformShort:'Plataforma', administration:'Administração', clinicPortal:'Portal da clínica',
   lastUpdated:'Atualizado', autoRefresh:'Atualiza automaticamente', conversations:'Conversas', openedAt:'Aberto às',
   sendShortcut:'Ctrl + Enter para registrar.', pendingSteps:'Etapas pendentes para ativação', nothingPending:'Nenhuma etapa pendente.',
-  title:'Portal da clínica', subtitle:'Acesso à equipe', workspace:'ATENDIMENTO · EQUIPE',
+  title:'Multiclinica', subtitle:'Acesso à equipe', workspace:'ATENDIMENTO · EQUIPE',
   login:'Identificação', password:'Senha', signIn:'Entrar', // pragma: allowlist secret (rótulos)
   code:'Código do autenticador', verify:'Verificar acesso', loading:'Carregando…',
   error:'Não foi possível concluir. Verifique o acesso e tente novamente.', logout:'Sair',

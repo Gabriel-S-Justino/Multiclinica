@@ -80,3 +80,19 @@ test('Minha conta mantém a navegação da plataforma e permite salvar o perfil'
   expect(await screen.findByRole('heading', {name:'Ana Lima'})).toBeInTheDocument();
   expect(await screen.findByText('Dados pessoais salvos.')).toBeInTheDocument();
 });
+
+test('alterna da clínica para a administração da plataforma pelo seletor lateral', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(
+    url.endsWith('/auth/session')
+      ? {user_id:'u', active_membership_id:'m', platform_access:true, memberships:[{id:'m', tenant_id:'t', role:'admin', clinic_name:'Clínica Teste', capabilities:['agenda.read']}]}
+      : url.endsWith('/portal/catalog') ? {timezone:'America/Sao_Paulo', services:[], professionals:[], units:[], resources:[]}
+      : url.endsWith('/platform/overview') ? {clinics:1, active_clinics:1, users:2, active_users:2, operators:1}
+      : {items:[]}
+  )));
+  mount('/agenda');
+  const select = await screen.findByRole('combobox', {name:'Selecionar clínica'});
+  expect(within(select).getByRole('option', {name:'Plataforma'})).toBeInTheDocument();
+  fireEvent.change(select, {target:{value:'__platform'}});
+  expect(await screen.findByRole('heading', {name:'Visão geral', level:1})).toBeInTheDocument();
+  expect(await screen.findByText('1 ativa · 0 inativas')).toBeInTheDocument();
+});
