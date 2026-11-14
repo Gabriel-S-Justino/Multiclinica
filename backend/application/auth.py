@@ -19,6 +19,7 @@ from backend.infrastructure.models import (
     Tenant,
     User,
 )
+from backend.infrastructure.portal_models import PlatformAudit
 from backend.infrastructure.security import (
     DUMMY_HASH,
     PASSWORDS,
@@ -35,6 +36,37 @@ class AuthError(Exception):
 
 class ReauthenticationRequired(AuthError):
     """A recent second-factor verification is required for sensitive operations."""
+
+
+class SecondFactorRejected(AuthError):
+    """Código do autenticador recusado. A falha já foi contada e precisa ser gravada."""
+
+
+MFA_MAX_FAILURES = 5
+MFA_LOCK_DURATION = timedelta(minutes=15)
+
+
+def second_factor_accepted(user: User, secret: str, code: str, moment: datetime) -> bool:
+    """Confere o código TOTP com proteção contra reuso e contra tentativas repetidas.
+
+    Depois de MFA_MAX_FAILURES falhas seguidas, a conta fica bloqueada para o segundo
+    fator por MFA_LOCK_DURATION, independentemente do IP ou do desafio usado.
+    """
+    if user.mfa_locked_until is not None and user.mfa_locked_until > moment:
+        return False
+    step = int(moment.timestamp()) // 30
+    if step <= user.last_totp_step or not hmac.compare_digest(
+        pyotp.TOTP(secret).at(moment).encode(), code.encode()
+    ):
+        user.mfa_failures = (user.mfa_failures or 0) + 1
+        if user.mfa_failures >= MFA_MAX_FAILURES:
+            user.mfa_failures = 0
+            user.mfa_locked_until = moment + MFA_LOCK_DURATION
+        return False
+    user.mfa_failures = 0
+    user.mfa_locked_until = None
+    user.last_totp_step = step
+    return True
 
 
 def login(
@@ -93,10 +125,8 @@ def verify_mfa(db: Session, settings: Settings, challenge_token: str, code: str)
     if not user or not user.active or not user.mfa_secret:
         raise AuthError
     secret = cipher(settings).decrypt(user.mfa_secret.encode()).decode()
-    step = int(now.timestamp()) // 30
-    if step <= user.last_totp_step or not hmac.compare_digest(pyotp.TOTP(secret).at(now), code):
-        raise AuthError
-    user.last_totp_step = step
+    if not second_factor_accepted(user, secret, code, now):
+        raise SecondFactorRejected
     db.delete(challenge)
     return create_session(db, settings, user.id, True)
 
@@ -206,9 +236,8 @@ def change_password(
     except (InvalidToken, ValueError, TypeError):
         raise AuthError from None
     moment = datetime.now(UTC)
-    step = int(moment.timestamp()) // 30
-    if step <= user.last_totp_step or not hmac.compare_digest(pyotp.TOTP(secret).at(moment), code):
-        raise AuthError
+    if not second_factor_accepted(user, secret, code, moment):
+        raise SecondFactorRejected
     member = db.scalar(
         select(Membership)
         .where(Membership.user_id == user.id, Membership.active.is_(True))
@@ -219,7 +248,6 @@ def change_password(
         raise AuthError
     set_tenant(db, member.tenant_id)
     user.password_hash = PASSWORDS.hash(new_password)
-    user.last_totp_step = step
     revoke_user_sessions(db, user.id)
     db.add(
         AuditLog(
@@ -268,12 +296,26 @@ def change_authenticated_password(
             .limit(1)
         )
     )
-    if not member or not member.active or member.user_id != user.id:
+    if member is not None and (not member.active or member.user_id != user.id):
         raise AuthError
-    set_tenant(db, member.tenant_id)
+    if member is not None:
+        set_tenant(db, member.tenant_id)
     user.password_hash = PASSWORDS.hash(new_password)
     revoke_user_sessions(db, user.id)
     db.execute(delete(RecoveryToken).where(RecoveryToken.user_id == user.id))
+    if member is None:
+        # Contas sem vínculo com clínica (operadores da plataforma) também trocam a senha;
+        # o registro vai para a auditoria global.
+        db.add(
+            PlatformAudit(
+                actor_id=user.id,
+                action="auth.password_changed",
+                resource_id=user.id,
+                correlation_id=uuid4(),
+                created_at=moment,
+            )
+        )
+        return
     db.add(
         AuditLog(
             id=uuid4(),

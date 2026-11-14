@@ -65,6 +65,7 @@ from backend.presentation.portal_outputs import (
     MessagePage,
     Page,
 )
+from backend.presentation.schemas import InvitationAcceptance
 
 
 def register_portal_routes(
@@ -195,12 +196,18 @@ def register_portal_routes(
     @app.post("/v1/auth/invitations/{invitation_id}/accept")
     def accept_invitation(
         invitation_id: UUID,
+        command: InvitationAcceptance,
         request: Request,
         session: PortalSession = Depends(session_dependency),
         db: Session = Depends(db_dependency, scope="function"),
     ) -> dict[str, Any]:
         return invitations.accept_invitation(
-            db, settings, session, invitation_id, UUID(request.state.correlation_id)
+            db,
+            settings,
+            session,
+            invitation_id,
+            UUID(request.state.correlation_id),
+            command.activation_code,
         )
 
     @app.get("/v1/schedules")

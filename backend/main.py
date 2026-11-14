@@ -1,6 +1,7 @@
 import hmac
 import json
 import logging
+import os
 import time
 import traceback
 from collections.abc import AsyncIterator, Generator
@@ -80,6 +81,8 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         version="0.1.0",
         docs_url=None,
         redoc_url=None,
+        # O contrato da API só fica público em desenvolvimento e testes.
+        openapi_url="/openapi.json" if settings.app_env in {"local", "test"} else None,
         lifespan=lifespan,
     )
     app.state.settings = settings
@@ -111,9 +114,23 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         if request.headers.get("origin") != settings.public_origin:
             raise HTTPException(403, "origin_denied")
 
+    on_vercel = os.environ.get("VERCEL") == "1"
+
+    def client_address(request: Request) -> str:
+        # Atrás da Vercel, a conexão chega do proxy; o IP do cliente vem em x-real-ip,
+        # que a própria Vercel sobrescreve. Fora dela, cabeçalhos encaminhados não são
+        # confiáveis e vale o endereço da conexão.
+        if on_vercel:
+            forwarded = (
+                request.headers.get("x-real-ip")
+                or request.headers.get("x-vercel-forwarded-for", "").split(",")[0]
+            )
+            if forwarded.strip():
+                return forwarded.strip()[:64]
+        return request.client.host if request.client else "sem-endereco"
+
     def throttle(request: Request, scope: str, subject: str = "") -> None:
-        # Never trust forwarded IP headers from arbitrary clients.
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = client_address(request)
         if not consume(database, settings, scope + ":ip", client_ip, 30):
             raise HTTPException(429, "rate_limited")
         if subject and not consume(database, settings, scope + ":subject", subject.lower(), 8):
@@ -206,8 +223,16 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
                         "form-action 'self'"
                     )
                 ),
-                "Cache-Control": "no-store",
+                # Arquivos com hash no nome nunca mudam; o restante não é guardado em cache.
+                "Cache-Control": (
+                    "public, max-age=31536000, immutable"
+                    if request.url.path.startswith("/assets/") and response.status_code == 200
+                    else "no-store"
+                ),
                 "X-Frame-Options": "DENY",
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+                "Cross-Origin-Opener-Policy": "same-origin",
             }
         )
         logger.info(
@@ -307,16 +332,21 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
 
-    @app.post("/v1/auth/mfa/verify")
+    @app.post("/v1/auth/mfa/verify", response_model=None)
     def mfa(
         command: VerifyMFA,
         request: Request,
         response: Response,
         db: Session = Depends(db_session, scope="function"),
-    ) -> dict[str, str]:
+    ) -> dict[str, str] | JSONResponse:
         login_origin(request)
         throttle(request, "mfa", command.challenge)
-        raw, csrf = auth.verify_mfa(db, settings, command.challenge, command.code)
+        try:
+            raw, csrf = auth.verify_mfa(db, settings, command.challenge, command.code)
+        except auth.SecondFactorRejected:
+            # Responder sem exceção mantém a transação: a falha precisa ser gravada
+            # para o bloqueio por conta funcionar.
+            return error_response(request, 401, "authentication_failed")
         cookies(response, raw, csrf)
         return {"status": "authenticated"}
 
@@ -468,22 +498,26 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
         response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="lax")
         response.delete_cookie(CSRF_COOKIE, secure=True, samesite="lax")
 
-    @app.post("/v1/auth/password/change", status_code=204)
+    @app.post("/v1/auth/password/change", status_code=204, response_model=None)
     def change_own_password(
         command: PasswordChange,
         request: Request,
         db: Session = Depends(db_session, scope="function"),
-    ) -> None:
+    ) -> JSONResponse | None:
         login_origin(request)
         throttle(request, "password-change", command.login)
-        auth.change_password(
-            db,
-            settings,
-            command.login,
-            command.current_password.get_secret_value(),
-            command.new_password.get_secret_value(),
-            command.code,
-        )
+        try:
+            auth.change_password(
+                db,
+                settings,
+                command.login,
+                command.current_password.get_secret_value(),
+                command.new_password.get_secret_value(),
+                command.code,
+            )
+        except auth.SecondFactorRejected:
+            return error_response(request, 401, "authentication_failed")
+        return None
 
     @app.post("/v1/auth/password/change-authenticated", status_code=204)
     def change_own_authenticated_password(

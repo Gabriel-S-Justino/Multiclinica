@@ -274,11 +274,15 @@ function UserRecord({user,member,ownAccount,onClose}:{
         <button type="button" className="secondary" onClick={()=>setAffiliation(link)}>{pt.permissions}</button>
       </div>)}</div>:<p className="muted">{user.platform_operator?'Conta global da plataforma, sem vínculo com clínicas.':'Sem vínculo institucional.'}</p>}
     </section>
-    {!ownAccount&&<section className="record-section danger-zone">
+    {!ownAccount&&user.platform_operator&&<section className="record-section">
+      <h3 className="group-title">Acesso à conta</h3>
+      <p className="muted">Por segurança, um operador da plataforma não pode desativar nem excluir outro operador pelo portal. Solicite a remoção pelo procedimento administrativo.</p>
+    </section>}
+    {!ownAccount&&!user.platform_operator&&<section className="record-section danger-zone">
       <h3 className="group-title">Acesso à conta</h3>
       <p className="muted">{user.active?'Desativar impede o acesso a todas as clínicas sem apagar o histórico.':'Esta conta está desativada.'}</p>
       <div className="record-actions">
-        {!user.platform_operator&&<ConfirmButton className="secondary" label={user.active?'Desativar acesso':'Reativar acesso'} title={user.active?'Desativar acesso':'Reativar acesso'}
+        {<ConfirmButton className="secondary" label={user.active?'Desativar acesso':'Reativar acesso'} title={user.active?'Desativar acesso':'Reativar acesso'}
           message={user.active?'A conta perderá acesso a todas as clínicas.':'A conta voltará a acessar seus vínculos ativos.'}
           busy={action.busy} onConfirm={()=>action.run(()=>action.send(path,{active:!user.active},'PATCH'),pt.saved)}/>}
         <ConfirmButton className="danger secondary" label="Excluir usuário" title="Excluir usuário"

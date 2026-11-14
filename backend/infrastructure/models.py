@@ -29,6 +29,8 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     mfa_secret: Mapped[str | None] = mapped_column(String(512))
     last_totp_step: Mapped[int] = mapped_column(default=-1)
+    mfa_failures: Mapped[int] = mapped_column(default=0)
+    mfa_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_service: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -231,7 +231,11 @@ class ReplyDraft(Versioned):
 
 class IntegrationDraft(Versioned):
     credentials: dict[str, SecretStr] = Field(
-        min_length=1, max_length=7, json_schema_extra={"writeOnly": True}
+        # WhatsApp usa 7 campos e a IA usa 8 (chave, provedor, modelo, ativação, duas
+        # referências e dois limites); o limite precisa comportar o maior conjunto.
+        min_length=1,
+        max_length=8,
+        json_schema_extra={"writeOnly": True},
     )
 
 

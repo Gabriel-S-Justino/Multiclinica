@@ -191,13 +191,32 @@ def list_invitations(db: Session, settings: Settings, session: PortalSession) ->
     }
 
 
+def invitation_code_matches(settings: Settings, invitation_id: UUID, code: str) -> bool:
+    """Confere se o código de ativação pertence a este convite de clínica."""
+    raw_id, _, signature = code.partition(".")
+    return raw_id == str(invitation_id) and hmac.compare_digest(
+        digest(settings, "invitation-activation", raw_id), signature
+    )
+
+
 def accept_invitation(
     db: Session,
     settings: Settings,
     session: PortalSession,
     invitation_id: UUID,
     correlation_id: UUID,
+    activation_code: str | None = None,
 ) -> dict[str, Any]:
+    """Aceita um convite de clínica para a conta logada.
+
+    O código de ativação é obrigatório: o login (e-mail) não é verificado, então quem
+    registrou um login antes poderia aceitar convites destinados ao dono real do e-mail.
+    Só a ativação de conta nova chama esta função sem código, após já tê-lo validado.
+    """
+    if activation_code is not None and not invitation_code_matches(
+        settings, invitation_id, activation_code
+    ):
+        raise PortalError("invitation_unavailable", 409)
     recipient = recipient_context(db, settings, session)
     row = db.scalar(
         select(Invitation).where(

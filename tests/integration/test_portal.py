@@ -527,6 +527,27 @@ def test_integration_write_only_cipher_and_secret_aware_idempotency(portal, capl
     )
 
 
+def test_ai_configuration_saves_every_field_at_once(portal):
+    p = portal
+    p.login()
+    credentials = {
+        "api_key": "synthetic-" + uuid4().hex,  # pragma: allowlist secret (valor sintético)
+        "provider": "openai",
+        "model": "synthetic-model",
+        "enabled": "true",
+        "data_policy_reference": "POLITICA-IA-1",
+        "contract_reference": "CONTRATO-IA-1",
+        "monthly_tokens": "409600",
+        "conversation_tokens": "8192",
+    }
+    p.call(
+        "PUT", "/v1/integrations/ai", p.command(version=0, credentials=credentials), expected=200
+    )
+    items = p.call("GET", "/v1/integrations", expected=200).json()["items"]
+    ai = next(item for item in items if item["provider"] == "ai")
+    assert ai["setup_complete"] and ai["metadata"]["enabled"] == "true"
+
+
 def test_inbox_concurrent_claim_reply_idempotency_and_return_to_bot(portal):
     p = portal
     p.login()
@@ -910,11 +931,13 @@ def test_invitation_requires_recipient_consent_and_does_not_enumerate_accounts(p
     assert (
         p.call("GET", "/v1/auth/invitations", expected=200).json()["items"][0]["id"] == known["id"]
     )
-    result = p.call("POST", f"/v1/auth/invitations/{known['id']}/accept", {}, expected=200).json()
-    assert (
-        p.call("POST", f"/v1/auth/invitations/{known['id']}/accept", {}, expected=200).json()
-        == result
-    )
+    accept = f"/v1/auth/invitations/{known['id']}/accept"
+    # Sem o código ou com o código de outro convite, a conta existente não entra na clínica.
+    p.call("POST", accept, {}, expected=422)
+    p.call("POST", accept, {"activation_code": unknown["activation_code"]}, expected=409)
+    code = {"activation_code": known["activation_code"]}
+    result = p.call("POST", accept, code, expected=200).json()
+    assert p.call("POST", accept, code, expected=200).json() == result
     session = p.call("GET", "/v1/auth/session", expected=200).json()
     assert result["membership_id"] in {member["id"] for member in session["memberships"]}
 
@@ -957,3 +980,60 @@ def test_invited_user_activates_in_portal_with_mfa(portal, issuer):
         == profile["full_name"]
     )
     p.call("POST", setup, activation, expected=409)
+
+
+def test_mfa_locks_account_after_repeated_wrong_codes(portal):
+    p = portal
+    origin = {"Origin": p.h.settings.public_origin}
+
+    def challenge():
+        response = p.client.post(
+            "/v1/auth/login",
+            json={"login": "reception@test.invalid", "password": p.password},
+            headers=origin,
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["challenge"]
+
+    p.client.cookies.clear()
+    valid = pyotp.TOTP(p.secrets["reception"]).now()
+    wrong = f"{(int(valid) + 1) % 1_000_000:06d}"
+    for _ in range(5):
+        result = p.client.post(
+            "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": wrong}, headers=origin
+        )
+        assert result.status_code == 401
+    # Bloqueada, a conta recusa até o código correto, em qualquer desafio.
+    blocked = p.client.post(
+        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": valid}, headers=origin
+    )
+    assert blocked.status_code == 401
+    with Session(p.h.admin) as db:
+        user = db.get(User, p.h.ids["reception"])
+        assert user.mfa_locked_until is not None and user.mfa_failures == 0
+    with Session(p.h.admin) as db, db.begin():
+        db.get(User, p.h.ids["reception"]).mfa_locked_until = datetime.now(UTC) - timedelta(
+            seconds=1
+        )
+    accepted = p.client.post(
+        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": valid}, headers=origin
+    )
+    assert accepted.status_code == 200, accepted.text
+
+
+def test_platform_operator_cannot_remove_or_rename_another_operator(portal):
+    p = portal
+    with Session(p.h.admin) as db, db.begin():
+        db.add(PlatformOperator(user_id=p.h.ids["admin"], active=True))
+    p.login("superadmin")
+    target = f"/v1/platform/users/{p.h.ids['admin']}"
+    p.call("DELETE", target, p.command(), expected=403)
+    p.call(
+        "PATCH",
+        f"{target}/profile",
+        p.command(login="renamed-operator@test.invalid", details=None),
+        expected=403,
+    )
+    with Session(p.h.admin) as db:
+        user = db.get(User, p.h.ids["admin"])
+        assert user.active and user.login == "admin@test.invalid"

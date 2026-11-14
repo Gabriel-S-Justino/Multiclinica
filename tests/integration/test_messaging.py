@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.application import ai_quota
 from backend.application.messaging_worker import process_one, send_one
 from backend.application.scheduling import Scheduler
 from backend.application.scheduling_commands import HoldRequest, ReleaseRequest
@@ -629,3 +630,35 @@ def test_unit_menu_is_bounded_and_paginated(messaging):
     assert len(first) == 9
     assert p.step(p.option(offset=8))[0] == "UNIT"
     assert len(p.context()[1]["options"]) == 8
+
+
+def test_ai_quota_charges_used_tokens_and_limits_conversations_per_month(messaging):
+    p = messaging
+    tenant = p.h.ids["tenant"]
+
+    def reserve(key):
+        return ai_quota.reserve(
+            db,
+            tenant,
+            key,
+            "contato-sintetico",
+            provider="openai",
+            model="synthetic",
+            tokens=4096,
+            monthly_limit=100000,
+            conversation_limit=8192,
+        )
+
+    with Session(p.h.runtime) as db, db.begin():
+        first = reserve("request-0001")
+        assert first is not None
+        ai_quota.settle(db, tenant, first, 100, succeeded=True)
+        # Concluída, a chamada conta só os 100 tokens usados, e não os 4096 reservados.
+        second = reserve("request-0002")
+        assert second is not None
+        ai_quota.settle(db, tenant, second, 0, succeeded=False)
+        # Uma falha sem resposta do provedor não consome cota.
+        third = reserve("request-0003")
+        assert third is not None
+        # Com a terceira ainda em andamento (4096 reservados), a quarta passaria do limite.
+        assert reserve("request-0004") is None

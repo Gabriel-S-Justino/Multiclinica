@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.db import set_tenant
@@ -54,16 +54,28 @@ def reserve(
             raise ValueError("quota_idempotency_conflict")
         # A reserved/complete request must never authorize a second provider call.
         return None
-    charged = func.coalesce(func.sum(AIUsage.reserved_tokens), 0)
-    # Conservative accounting: even failures consume the reservation until reconciliation.
+    # Reservas em andamento contam pelo valor reservado; chamadas concluídas ou com falha
+    # contam pelo que o provedor realmente usou (falhas sem resposta não consomem cota).
+    charged = func.coalesce(
+        func.sum(
+            case(
+                (AIUsage.status == "reserved", AIUsage.reserved_tokens),
+                else_=AIUsage.used_tokens,
+            )
+        ),
+        0,
+    )
     total = (
         db.scalar(select(charged).where(AIUsage.tenant_id == tenant_id, AIUsage.period == period))
         or 0
     )
+    # O limite por conversa vale por contato e por mês, não para sempre.
     conversation = (
         db.scalar(
             select(charged).where(
-                AIUsage.tenant_id == tenant_id, AIUsage.conversation_key == conversation_key
+                AIUsage.tenant_id == tenant_id,
+                AIUsage.conversation_key == conversation_key,
+                AIUsage.period == period,
             )
         )
         or 0

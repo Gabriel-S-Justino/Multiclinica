@@ -519,6 +519,10 @@ th small { font-weight: 500; text-transform: none; letter-spacing: 0; }
 .setup-checklist a { font-weight: 600; }
 .setup-next { margin: 14px 0 0; font-size: 13px; }
 
+.invitation-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto; align-items: end; gap: 12px 16px; }
+.invitation-card .wide .feedback { margin: 0; }
+@media (max-width: 760px) { .invitation-card { grid-template-columns: 1fr; } }
+
 // Movimento reduzido --------------------------------------------------
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

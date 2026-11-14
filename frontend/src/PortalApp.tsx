@@ -75,10 +75,20 @@ function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;inf
     </div></main></div>;
 }
 
+function InvitationCard({row,onAccepted}:{row:{id:string;clinic_name:string;role:string};onAccepted:()=>Promise<unknown>}) {
+  const [code,setCode]=useState('');const action=useAction();
+  return <form className="record-card invitation-card" onSubmit={event=>{event.preventDefault();void action.run(async()=>{await api(`/auth/invitations/${row.id}/accept`,{activation_code:code.trim()});await onAccepted();},pt.invitationAccepted);}}>
+    <div className="record-main"><h3>{row.clinic_name}</h3><p className="muted">{pt.roles[row.role]}</p></div>
+    <Label text={pt.activationCode} hint={pt.acceptCodeHint}><input required autoComplete="off" spellCheck={false} maxLength={128} value={code} onChange={event=>setCode(event.target.value)}/></Label>
+    <button disabled={action.busy||!code.trim()}>{pt.acceptInvitation}</button>
+    <div className="wide"><Feedback action={action}/></div>
+  </form>;
+}
+
 function Invitations({onAccepted}: {onAccepted:()=>Promise<unknown>}) {
-  const result=useQuery({queryKey:['invitations'],queryFn:()=>api<Page<{id:string;clinic_name:string;role:string}>>('/auth/invitations'),retry:false});const action=useAction();
+  const result=useQuery({queryKey:['invitations'],queryFn:()=>api<Page<{id:string;clinic_name:string;role:string}>>('/auth/invitations'),retry:false});
   if(!result.data?.items.length)return null;
-  return <section className="invitation-panel" aria-label={pt.invitations}><h2>{pt.invitations}</h2><Feedback action={action}/>{result.data.items.map(row=><div className="record-card" key={row.id}><div><h3>{row.clinic_name}</h3><p className="muted">{pt.roles[row.role]}</p></div><button disabled={action.busy} onClick={()=>void action.run(async()=>{await api(`/auth/invitations/${row.id}/accept`,{});await result.refetch();await onAccepted();},pt.invitationAccepted)}>{pt.acceptInvitation}</button></div>)}</section>;
+  return <section className="invitation-panel" aria-label={pt.invitations}><h2>{pt.invitations}</h2>{result.data.items.map(row=><InvitationCard key={row.id} row={row} onAccepted={async()=>{await result.refetch();await onAccepted();}}/>)}</section>;
 }
 
 function Roster({member}: {member:Membership}) {
