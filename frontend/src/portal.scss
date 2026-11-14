@@ -502,6 +502,23 @@ th small { font-weight: 500; text-transform: none; letter-spacing: 0; }
 .manual-key[open] summary { margin-bottom: 10px; }
 .capitalize::first-letter { text-transform: uppercase; }
 
+// Estado do sistema e orientação --------------------------------------
+.updated-at { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 4px; font-size: 12px; color: var(--muted); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4f9b6d; box-shadow: 0 0 0 3px rgb(79 155 109 / 18%); }
+.tabular { font-variant-numeric: tabular-nums; }
+.hold-timer.is-ending { background: var(--warn-bg); border-color: #efd9a8; color: var(--warn-ink); }
+.hold-timer.is-ending > .icon { color: var(--warn-ink); }
+.setup-checklist { border-color: #b9d6c1; background: linear-gradient(120deg, var(--green-50), var(--surface) 70%); }
+.setup-checklist h2 { margin-bottom: 4px; }
+.setup-checklist ol { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 10px; }
+.setup-checklist li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.setup-checklist li .step-index { flex: 0 0 auto; }
+.setup-checklist li.done { color: var(--muted); }
+.setup-checklist li.done .step-index { background: var(--green-100); border-color: #b9d6c1; color: var(--green-800); }
+.setup-checklist li.done > span:nth-child(2) { text-decoration: line-through; text-decoration-color: #9aa69a; }
+.setup-checklist a { font-weight: 600; }
+.setup-next { margin: 14px 0 0; font-size: 13px; }
+
 // Movimento reduzido --------------------------------------------------
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

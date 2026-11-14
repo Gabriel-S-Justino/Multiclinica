@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { formatRange, isoToZoned, weekStart, zonedToIso } from './ui';
+import { formatRange, isoToZoned, timezoneLabel, weekStart, zonedToIso } from './ui';
 
 test('converte horário local da clínica para ISO com deslocamento explícito', () => {
   expect(zonedToIso('2026-11-15T12:00', 'America/Sao_Paulo')).toBe('2026-11-15T12:00:00-03:00');
@@ -13,4 +13,9 @@ test('semana da agenda começa na segunda-feira', () => {
   expect(weekStart('2026-11-12')).toBe('2026-11-09');
   expect(weekStart('2026-11-15')).toBe('2026-11-09');
   expect(formatRange('2026-11-09', '2026-11-15')).toBe('9 a 15 de nov. de 2026');
+});
+
+test('mostra o fuso da clínica com nome legível e deslocamento', () => {
+  expect(timezoneLabel('America/Sao_Paulo')).toMatch(/Brasília.*\(UTC-3\)/);
+  expect(timezoneLabel('')).toBe('');
 });

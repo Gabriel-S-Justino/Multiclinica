@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivationCode } from './AccountActivation';
 import { api } from './api';
 import { pt } from './locales';
-import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, formatInstant, formatLongDay, isoToZoned, minutes, useAction, useRemote, zonedToIso } from './ui';
+import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, formatInstant, formatLongDay, isoToZoned, minutes, useAction, useRemote, zonedToIso, useDiscardGuard } from './ui';
 import type { Catalog, EntityReceipt, IntegrationState, Membership, Page, Queue, RecordData, SupportRequest } from './types';
 
 type Option = {value:string; label:string};
@@ -27,6 +27,8 @@ export function Editor({title, fields, initial, busy, onSave, onCancel, action, 
     const raw = initial?.[field.name] ?? field.initial ?? (field.type==='checkbox'?false:field.type==='multi'?[]:'');
     return [field.name, field.type==='datetime' && typeof raw==='string' && raw ? isoToZoned(raw,timezone) : raw];
   })));
+  const [pristine] = useState(()=>JSON.stringify(values));
+  const guard = useDiscardGuard(JSON.stringify(values)!==pristine, onCancel);
   const visible = fields.filter(field=>!field.when || Boolean(values[field.when.name])===field.when.value);
   function submit() {
     const payload:RecordData = {version:typeof initial?.version==='number'?initial.version:0};
@@ -59,11 +61,12 @@ export function Editor({title, fields, initial, busy, onSave, onCancel, action, 
   }
   const groups:{name?:string;fields:Field[]}[] = [];
   for (const field of visible) { const current = groups.at(-1); if (current && current.name===field.group) current.fields.push(field); else groups.push({name:field.group,fields:[field]}); }
-  return <Modal title={title} onClose={()=>{if(!busy)onCancel();}} size={visible.length>8?'wide':undefined}>
+  return <Modal title={title} onClose={()=>{if(!busy)guard.requestClose();}} size={visible.length>8?'wide':undefined}>
+    {guard.dialog}
     {action && <Feedback action={action} errorsOnly/>}{intro}
     <form className="editor-form" onSubmit={event=>{event.preventDefault();submit();}}>
       {groups.map((group,index)=><div className="form-group" key={`${group.name??''}:${index}`}>{group.name && <h3 className="group-title">{group.name}</h3>}<div className="form-grid">{group.fields.map(control)}</div></div>)}
-      <div className="form-actions sticky-actions">{danger && <div className="push-left">{danger}</div>}<button type="button" className="secondary" disabled={busy} onClick={onCancel}>{pt.cancel}</button><button disabled={busy}>{busy?pt.loading:pt.save}</button></div>
+      <div className="form-actions sticky-actions">{danger && <div className="push-left">{danger}</div>}<button type="button" className="secondary" disabled={busy} onClick={guard.requestClose}>{pt.cancel}</button><button disabled={busy}>{busy?pt.loading:pt.save}</button></div>
     </form>
   </Modal>;
 }

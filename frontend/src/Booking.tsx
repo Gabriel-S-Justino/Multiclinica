@@ -1,8 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api';
 import { pt } from './locales';
-import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, Status, formatDay, formatLongDay, localDay, useAction, useRemote } from './ui';
+import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, Status, formatDay, formatLongDay, localDay, timezoneLabel, useAction, useRemote } from './ui';
 import type { Appointment, AppointmentReceipt, Catalog, Hold, Membership, Page, PatientOption, Slot, Summary } from './types';
+
+/** Segundos restantes até um instante, atualizados a cada segundo. */
+function useSecondsLeft(until?: string) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!until) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [until]);
+  return until ? Math.max(0, Math.floor((new Date(until).getTime() - now) / 1000)) : 0;
+}
+
+function HoldTimer({seconds, until, timezone}: {seconds: number; until: string; timezone: string}) {
+  const clock = new Intl.DateTimeFormat('pt-BR', {hour:'2-digit', minute:'2-digit', timeZone: timezone}).format(new Date(until));
+  if (!seconds) return <p className="feedback error" role="alert"><Icon name="alert"/><span>{pt.holdExpired}</span></p>;
+  const remaining = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  return <p className={`note compact hold-timer${seconds <= 60 ? ' is-ending' : ''}`}><Icon name="clock" size={16}/>
+    <span>{pt.reservedUntil} {clock}. {pt.timeLeft} <strong className="tabular">{remaining}</strong>.</span></p>;
+}
 
 export function Booking({member, original, onClose, onDone}: {member: Membership; original?: Appointment; onClose: () => void; onDone: (id:string) => void}) {
   const catalog = useRemote<Catalog>(member, '/portal/catalog');
@@ -24,6 +43,7 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
   const [hold, setHold] = useState<Hold>();
   const [summary, setSummary] = useState<Summary>();
   const service = catalog.data?.services.find(item => item.id === serviceId);
+  const secondsLeft = useSecondsLeft(summary?.expires_at);
 
   async function lookup() {
     await action.run(async () => {
@@ -83,10 +103,13 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
         <dt>{pt.service}</dt><dd>{summary.service_name}</dd><dt>{pt.professional}</dt><dd>{summary.professional_name}</dd>
         <dt>{pt.date}</dt><dd>{formatLongDay(summary.local_date)} · {summary.local_start}</dd><dt>{pt.unit}</dt><dd>{summary.unit_name}</dd>
         <dt>{pt.durationShort}</dt><dd>{summary.duration_minutes} {pt.minutesShort}</dd>
-        <dt>{pt.timezone}</dt><dd>{summary.timezone}</dd>
-      </dl><p className="note compact"><Icon name="clock" size={16}/>{pt.reservedUntil} {new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:summary.timezone}).format(new Date(summary.expires_at))}</p>
-      <div className="form-actions"><button className="secondary" disabled={action.busy} onClick={() => void release()}>{pt.back}</button>
-        <button disabled={action.busy} onClick={() => void confirm()}>{action.busy ? pt.loading : original ? pt.confirmReschedule : pt.confirmBooking}</button></div>
+        <dt>{pt.timezone}</dt><dd>{timezoneLabel(summary.timezone)}</dd>
+      </dl><HoldTimer seconds={secondsLeft} until={summary.expires_at} timezone={summary.timezone}/>
+      <div className="form-actions"><button className="secondary" disabled={action.busy} onClick={() => {
+          // Uma reserva expirada já foi liberada pelo servidor; basta voltar à escolha de horário.
+          if (secondsLeft) void release(); else { setHold(undefined); setSummary(undefined); setSlots([]); setSearched(false); }
+        }}>{secondsLeft ? pt.back : pt.chooseAnotherSlot}</button>
+        <button disabled={action.busy || !secondsLeft} onClick={() => void confirm()}>{action.busy ? pt.loading : original ? pt.confirmReschedule : pt.confirmBooking}</button></div>
     </> : <>
       {original ? <div className="context-card"><Icon name="user"/><div><strong>{original.patient_name}</strong><p className="muted">{original.service_name} · {formatDay(original.local_date)} {original.local_start}</p></div></div>
       : <section className="form-section"><h3>{pt.patient}</h3><p className="muted">{pt.contactDifferent}</p>
@@ -101,6 +124,7 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
               <label className="check wide"><input type="checkbox" checked={purpose} onChange={event=>setPurpose(event.target.checked)}/>{pt.purpose}</label></div>}
           </>}
       </section>}
+      {!original && !catalog.data.services.some(item=>item.bookable) && <p className="note"><Icon name="info" size={16}/>{pt.noBookableServices}</p>}
       <form className="form-grid" onSubmit={event=>{event.preventDefault(); void search();}}>
         <Label text={pt.service}><select required disabled={!!original} value={serviceId} onChange={event=>{setService(event.target.value); setSlots([]); setSearched(false);}}><option value="">{pt.select}</option>
           {catalog.data.services.filter(item=>item.bookable || item.id===original?.service_id).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Label>
@@ -141,7 +165,7 @@ export function AppointmentDetails({member, appointmentId, onClose, onReschedule
         <label className="check wide"><input type="checkbox" required checked={authority} onChange={event=>setAuthority(event.target.checked)}/>{pt.authorityChecked}</label><div className="form-actions wide"><button type="button" className="secondary" disabled={action.busy} onClick={()=>setMode('details')}>{pt.back}</button><button disabled={action.busy}>{pt.verifyIdentity}</button></div>
       </form> : <div className="form-actions wrap details-actions">
         {row.actions.includes('cancel') && <button className="danger secondary push-left" onClick={()=>setMode('cancel')}>{pt.cancelAppointment}</button>}
-        {row.actions.includes('no_show') && <button disabled={action.busy} className="secondary" onClick={()=>void change('no_show')}>{pt.noShow}</button>}
+        {row.actions.includes('no_show') && <ConfirmButton className="secondary" label={pt.noShow} title={pt.noShowTitle} message={pt.noShowMessage} busy={action.busy} onConfirm={()=>change('no_show')}/>}
         {row.actions.includes('reschedule') && <button className="secondary" onClick={()=>onReschedule(row)}>{pt.reschedule}</button>}
         {row.actions.includes('verify_identity') && <button className="secondary" onClick={()=>setMode('verify')}>{pt.verifyIdentity}</button>}
         {row.actions.includes('complete') && <button disabled={action.busy} onClick={()=>void change('completed')}>{pt.complete}</button>}

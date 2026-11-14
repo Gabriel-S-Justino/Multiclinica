@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, cleanup, render, screen, fireEvent, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { App } from './App';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -95,4 +95,42 @@ test('alterna da clínica para a administração da plataforma pelo seletor late
   fireEvent.change(select, {target:{value:'__platform'}});
   expect(await screen.findByRole('heading', {name:'Visão geral', level:1})).toBeInTheDocument();
   expect(await screen.findByText('1 ativa · 0 inativas')).toBeInTheDocument();
+});
+
+test('voltar à aba durante o login mantém a etapa do autenticador e os dados digitados', async () => {
+  const delayed401 = () => new Promise<Response>(resolve => setTimeout(() => resolve(new Response('{}', {status:401})), 20));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('/auth/login')
+    ? Response.json({status:'mfa_required', challenge:'c1'})
+    : delayed401()));
+  mount();
+  fireEvent.change(await screen.findByLabelText('Identificação'), {target:{value:'ana@clinica.test'}});
+  fireEvent.change(screen.getByLabelText('Senha'), {target:{value:'senha-sintetica-longa'}}); // pragma: allowlist secret (dado sintético)
+  fireEvent.click(screen.getByRole('button', {name:'Entrar'}));
+  fireEvent.change(await screen.findByLabelText('Código do autenticador'), {target:{value:'123'}});
+  await act(async () => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+  expect(screen.getByLabelText('Código do autenticador')).toHaveValue('123');
+  focusManager.setFocused(undefined);
+});
+
+test('pede confirmação antes de descartar alterações de um formulário', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(
+    url.endsWith('/auth/session')
+      ? {user_id:'u', active_membership_id:null, memberships:[], platform_access:true}
+      : url.includes('/platform/tenants') ? {items:[{id:'t', name:'Clínica Teste', timezone:'America/Sao_Paulo', active:true, version:1, registration:null}]}
+      : {items:[]}
+  )));
+  mount('/admin/clinics');
+  fireEvent.click(await screen.findByRole('button', {name:'Editar'}));
+  fireEvent.change(screen.getByLabelText('Nome fantasia'), {target:{value:'Outro nome'}});
+  fireEvent.click(screen.getByRole('button', {name:'Cancelar'}));
+  expect(await screen.findByRole('heading', {name:'Descartar alterações?'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name:'Continuar editando'}));
+  expect(screen.getByLabelText('Nome fantasia')).toHaveValue('Outro nome');
+  fireEvent.click(screen.getByRole('button', {name:'Cancelar'}));
+  fireEvent.click(await screen.findByRole('button', {name:'Descartar'}));
+  expect(screen.queryByLabelText('Nome fantasia')).not.toBeInTheDocument();
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivationCode } from './AccountActivation';
 import { pt } from './locales';
 import { clinicRoles, Editor, permissionFields, type Field } from './Management';
@@ -90,10 +90,13 @@ export function Platform({member,userId,section,title}:{
   const [clinicCursor,setClinicCursor]=useState('');
   const [userCursor,setUserCursor]=useState('');
   const [search,setSearch]=useState('');
+  const [query,setQuery]=useState('');
+  // Espera a pessoa parar de digitar antes de consultar o servidor.
+  useEffect(()=>{const timer=window.setTimeout(()=>setQuery(search.trim()),300);return()=>window.clearTimeout(timer);},[search]);
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [permissionsClinic,setPermissionsClinic]=useState<Clinic|null>(null);
   const tenants=useRemote<Page<Clinic>>(member,section==='clinics'?`/platform/tenants?limit=50&cursor=${encodeURIComponent(clinicCursor)}`:null);
-  const users=useRemote<Page<PlatformUser>>(member,section==='users'?`/platform/users?limit=50&search=${encodeURIComponent(search)}&cursor=${encodeURIComponent(userCursor)}`:null);
+  const users=useRemote<Page<PlatformUser>>(member,section==='users'?`/platform/users?limit=50&search=${encodeURIComponent(query)}&cursor=${encodeURIComponent(userCursor)}`:null);
   const selected=users.data?.items.find(user=>user.id===selectedId);
   const editingClinic=editing&&typeof editing.id==='string'?editing as Clinic:null;
 

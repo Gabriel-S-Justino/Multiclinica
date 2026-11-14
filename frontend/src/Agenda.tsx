@@ -1,8 +1,30 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppointmentDetails, Booking } from './Booking';
 import { pt } from './locales';
-import { Empty, Failure, Icon, Label, Loading, PageHeader, Status, formatDay, formatRange, formatWeekday, localDay, shiftDay, useRemote, weekStart } from './ui';
+import { Empty, Failure, Icon, Label, Loading, PageHeader, Status, formatDay, formatRange, formatWeekday, localDay, shiftDay, useRemote, weekStart, timezoneLabel } from './ui';
 import type { Appointment, Catalog, Membership, Page } from './types';
+
+/** Passos mínimos para a clínica conseguir agendar: unidade, profissional ativo e serviço liberado. */
+function SetupChecklist({member, catalog}: {member:Membership; catalog:Catalog}) {
+  const steps = [
+    {done: catalog.units.length > 0, label: pt.setupUnit, to: '/settings', cap: 'settings.manage'},
+    {done: catalog.professionals.some(item => item.active), label: pt.setupProfessional, to: '/team', cap: 'team.manage'},
+    {done: catalog.services.some(item => item.bookable), label: pt.setupService, to: '/services', cap: 'services.manage'},
+  ];
+  if (steps.every(step => step.done)) return null;
+  const canConfigure = steps.some(step => member.capabilities?.includes(step.cap));
+  return <section className="panel setup-checklist" aria-labelledby="setup-title">
+    <h2 id="setup-title">{pt.setupTitle}</h2>
+    <p className="muted">{canConfigure ? pt.setupHint : pt.setupAskAdmin}</p>
+    {canConfigure && <ol>{steps.map(step => <li key={step.label} className={step.done ? 'done' : ''}>
+      <span className="step-index" aria-hidden="true">{step.done ? <Icon name="check" size={14}/> : null}</span>
+      {step.done || !member.capabilities?.includes(step.cap) ? <span>{step.label}</span> : <Link to={step.to}>{step.label}</Link>}
+      <span className="visually-hidden">{step.done ? pt.stepDone : pt.stepPending}</span>
+    </li>)}</ol>}
+    {canConfigure && <p className="muted setup-next">{pt.setupSchedules}</p>}
+  </section>;
+}
 
 function prefersDayView() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 760px)').matches;
@@ -32,6 +54,7 @@ export function Agenda({member}: {member:Membership}) {
   const active = items.filter(row=>days.includes(row.local_date) && row.status!=='canceled' && row.status!=='rescheduled').length;
   return <>
     <PageHeader title={pt.agenda} description={pt.agendaDescription}><button onClick={()=>{setBooking(true);setNotice('');}}><Icon name="plus" size={16}/>{pt.newAppointment}</button></PageHeader>
+    {catalog.data && <SetupChecklist member={member} catalog={catalog.data}/>}
     {notice && <p role="status" className="feedback success"><Icon name="check"/><span>{notice}</span><button type="button" className="feedback-dismiss" aria-label={pt.dismiss} onClick={()=>setNotice('')}><Icon name="close" size={16}/></button></p>}
     <section className="calendar-panel" aria-label={pt.agenda}>
       <div className="calendar-toolbar">
@@ -60,7 +83,7 @@ export function Agenda({member}: {member:Membership}) {
             </button>)}{!rows.length && <Empty compact>{pt.noAppointments}</Empty>}</div></section>;
         })}
       </div>}
-      <footer className="calendar-footer"><span><Icon name="globe" size={14}/>{pt.timezone}: {catalog.data?.timezone ?? member.timezone}</span><div className="form-actions">
+      <footer className="calendar-footer"><span><Icon name="globe" size={14}/>{pt.timezone}: {timezoneLabel(catalog.data?.timezone ?? member.timezone)}</span><div className="form-actions">
         {cursor && <button type="button" className="secondary" onClick={()=>setCursor(undefined)}>{pt.firstPage}</button>}
         {appointments.data?.next_cursor && <button type="button" className="secondary" onClick={()=>setCursor(appointments.data?.next_cursor ?? undefined)}>{pt.morePage}</button>}</div></footer>
     </section>

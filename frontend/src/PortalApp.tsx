@@ -9,7 +9,7 @@ import { InboxPage } from './InboxPage';
 import { Platform, type PlatformSection } from './Platform';
 import { Profile } from './Profile';
 import { pt } from './locales';
-import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, useAction, useRemote, type IconName } from './ui';
+import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, timezoneLabel, useAction, useRemote, type IconName } from './ui';
 import type { Membership, Page, Professional, Session } from './types';
 
 function Login({onAuthenticated,info}: {onAuthenticated:()=>Promise<unknown>;info?:string}) {
@@ -164,7 +164,7 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
   </aside><div className="sidebar-backdrop" aria-hidden="true" onClick={()=>setMenuOpen(false)}/>
   <div className="workspace-main"><header className="topbar">
       <button type="button" className="icon-button ghost menu-toggle" aria-label={pt.openMenu} aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={()=>setMenuOpen(true)}><Icon name="menu"/></button>
-      <div className="topbar-context"><strong>{inPlatform?platformTitle:member?.clinic_name??pt.title}</strong>{!inPlatform&&member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{member.timezone}</span>}</div>
+      <div className="topbar-context"><strong>{inPlatform?platformTitle:member?.clinic_name??pt.title}</strong>{!inPlatform&&member?.timezone&&<span className="timezone"><Icon name="globe" size={14}/>{timezoneLabel(member.timezone)}</span>}</div>
       <div className="account">
         <NavLink to={inPlatform?platformAccount:'/account'} className="account-link" onClick={()=>setMenuOpen(false)}>
           <Icon name="user" size={18}/><span>{pt.myAccount}</span>
@@ -194,14 +194,18 @@ function Workspace({session,member,onSwitch,onLogout,onPasswordChanged,switching
 
 export function App() {
   const navigate=useNavigate();
-  const client=useQueryClient();const session=useQuery({queryKey:['session'],queryFn:()=>api<Session>('/auth/session'),retry:false});
-  const [switching,setSwitching]=useState(false);const [passwordChanged,setPasswordChanged]=useState(false);const action=useAction();
+  const client=useQueryClient();// Sem sessão carregada, não revalidar ao voltar o foco ou a conexão: a consulta voltaria a "pendente",
+  // desmontaria a tela de login e apagaria o que a pessoa digitou (por exemplo, ao buscar o código no autenticador).
+  const revalidateSession=(query:{state:{data:unknown}})=>query.state.data!==undefined;
+  const session=useQuery({queryKey:['session'],queryFn:()=>api<Session>('/auth/session'),retry:false,refetchOnWindowFocus:revalidateSession,refetchOnReconnect:revalidateSession});
+  const [switching,setSwitching]=useState(false);const [passwordChanged,setPasswordChanged]=useState(false);const [sessionExpired,setSessionExpired]=useState(false);const action=useAction();
   const refetch=session.refetch;
-  useEffect(()=>{function expire(){client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});void refetch();}window.addEventListener('clinic:session-expired',expire);return()=>window.removeEventListener('clinic:session-expired',expire);},[client,refetch]);
+  useEffect(()=>{function expire(){setSessionExpired(true);client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});void refetch();}window.addEventListener('clinic:session-expired',expire);return()=>window.removeEventListener('clinic:session-expired',expire);},[client,refetch]);
   const unauthenticated=session.isError&&session.error instanceof ApiError&&session.error.status===401;
   useEffect(()=>{if(unauthenticated)document.title=`${pt.signIn} · ${pt.title}`;},[unauthenticated]);
   async function authenticated(){
     setPasswordChanged(false);
+    setSessionExpired(false);
     client.clear();
     const result=await refetch();
     if(result.data?.platform_access) navigate(platformHome,{replace:true});
@@ -211,6 +215,6 @@ export function App() {
   async function switchClinic(id:string){setSwitching(true);await action.run(async()=>{await client.cancelQueries();client.removeQueries({predicate:query=>query.queryKey[0]!=='session'});await api('/auth/active-membership',{membership_id:id});const result=await refetch();const member=result.data?.memberships.find(item=>item.id===id);navigate(member?.capabilities?.includes('platform.manage')?platformHome:'/agenda',{replace:true});});setSwitching(false);}
   async function logout(){await action.run(async()=>{await api('/auth/logout',{});client.clear();await refetch();});}
   if(session.isPending)return <main className="startup"><Loading/></main>;
-  if(session.isError){if(unauthenticated)return <Login onAuthenticated={authenticated} info={passwordChanged?pt.passwordChanged:undefined}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}><Icon name="refresh" size={16}/>{pt.refresh}</button></main>;}
+  if(session.isError){if(unauthenticated)return <Login onAuthenticated={authenticated} info={passwordChanged?pt.passwordChanged:sessionExpired?pt.sessionExpired:undefined}/>;return <main className="startup"><Failure error={session.error}/><button onClick={()=>void refetch()}><Icon name="refresh" size={16}/>{pt.refresh}</button></main>;}
   return <>{action.error!==undefined&&<div className="global-feedback"><Feedback action={action} errorsOnly/></div>}<Workspace onPasswordChanged={passwordChangedSuccessfully} session={session.data} member={session.data.memberships.find(item=>item.id===session.data.active_membership_id)} switching={switching} onSwitch={switchClinic} onLogout={logout} onAccepted={refetch}/></>;
 }

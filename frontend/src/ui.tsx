@@ -4,8 +4,13 @@ import { api, ApiError } from './api';
 import { pt } from './locales';
 import type { Membership, RecordData } from './types';
 
-export function useRemote<T>(member: Membership, path: string | null) {
-  return useQuery({ queryKey: ['clinic', member.id, path], queryFn: ({signal}) => api<T>(path!, undefined, 'GET', signal), enabled: path !== null, retry: false });
+export function useRemote<T>(member: Membership, path: string | null, options: {refetchInterval?: number} = {}) {
+  return useQuery({ queryKey: ['clinic', member.id, path], queryFn: ({signal}) => api<T>(path!, undefined, 'GET', signal), enabled: path !== null, retry: false, ...options });
+}
+/** Mostra quando os dados foram atualizados, para filas que se renovam sozinhas. */
+export function UpdatedAt({at, timezone}: {at: number; timezone?: string}) {
+  if (!at) return null;
+  return <span className="updated-at"><span className="live-dot" aria-hidden="true"/>{pt.updatedAt} {new Date(at).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', timeZone: timezone})}</span>;
 }
 
 export function errorText(error: unknown): string {
@@ -113,6 +118,18 @@ export function Modal({title, children, onClose, size}: {title: string; children
   return <dialog ref={dialog} className={size ? `dialog-${size}` : undefined} aria-labelledby={titleId} onCancel={(event) => {event.preventDefault(); onClose();}}><div className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button ghost" onClick={onClose} aria-label={pt.close}><Icon name="close"/></button></div><div className="dialog-body">{children}</div></dialog>;
 }
 
+/** Pede confirmação antes de fechar um formulário com alterações não salvas (Esc, X ou Cancelar). */
+export function useDiscardGuard(dirty: boolean, onDiscard: () => void) {
+  const [asking, setAsking] = useState(false);
+  const requestClose = () => { if (dirty) setAsking(true); else onDiscard(); };
+  const dialog = asking ? <Modal title={pt.discardTitle} size="narrow" onClose={() => setAsking(false)}>
+    <p>{pt.discardMessage}</p>
+    <div className="form-actions"><button type="button" className="secondary" autoFocus onClick={() => setAsking(false)}>{pt.keepEditing}</button>
+      <button type="button" className="danger" onClick={() => { setAsking(false); onDiscard(); }}>{pt.discard}</button></div>
+  </Modal> : null;
+  return {requestClose, dialog};
+}
+
 /** Botão que pede confirmação explícita antes de uma ação destrutiva. */
 export function ConfirmButton({label, title, message, confirmLabel, busy, onConfirm, className = 'text-button danger'}: {label: string; title: string; message: string; confirmLabel?: string; busy?: boolean; onConfirm: () => Promise<unknown> | void; className?: string}) {
   const [open, setOpen] = useState(false);
@@ -120,7 +137,7 @@ export function ConfirmButton({label, title, message, confirmLabel, busy, onConf
     <button type="button" className={className} disabled={busy} onClick={() => setOpen(true)}>{label}</button>
     {open && <Modal title={title} size="narrow" onClose={() => setOpen(false)}>
       <p>{message}</p>
-      <div className="form-actions"><button type="button" className="secondary" onClick={() => setOpen(false)}>{pt.cancel}</button>
+      <div className="form-actions"><button type="button" className="secondary" autoFocus onClick={() => setOpen(false)}>{pt.cancel}</button>
         <button type="button" className="danger" disabled={busy} onClick={() => { setOpen(false); void onConfirm(); }}>{confirmLabel ?? label}</button></div>
     </Modal>}
   </>;
@@ -146,6 +163,19 @@ export function formatRange(first: string, last: string): string {
 export function formatInstant(value: string, timezone?: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('pt-BR', {dateStyle:'short', timeStyle:'short', timeZone: timezone}).format(date);
+}
+/** Nome legível do fuso (ex.: "Horário de Brasília (UTC-3)"), com o identificador técnico como alternativa. */
+export function timezoneLabel(timezone?: string): string {
+  if (!timezone) return '';
+  try {
+    const part = (style: Intl.DateTimeFormatOptions['timeZoneName']) => new Intl.DateTimeFormat('pt-BR', {timeZone: timezone, timeZoneName: style}).formatToParts(new Date()).find(item => item.type === 'timeZoneName')?.value;
+    const name = part('longGeneric');
+    const offset = part('shortOffset')?.replace('GMT', 'UTC');
+    if (!name || name === timezone) return offset ? `${timezone} (${offset})` : timezone;
+    return offset ? `${name} (${offset})` : name;
+  } catch {
+    return timezone;
+  }
 }
 export function minutes(value: number): string { return `${String(Math.floor(value/60)).padStart(2,'0')}:${String(value%60).padStart(2,'0')}`; }
 

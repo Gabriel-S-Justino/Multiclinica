@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { pt } from './locales';
-import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, useAction, useRemote } from './ui';
+import { Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, UpdatedAt, useAction, useRemote } from './ui';
+
+/** Intervalos de atualização automática; pausam quando a aba não está visível. */
+const LIST_REFRESH_MS = 20_000;
+const CONVERSATION_REFRESH_MS = 10_000;
 import type { Handoff, Membership, Message, Page, Queue } from './types';
 
 function time(value: string, timezone?: string) {
@@ -9,7 +13,7 @@ function time(value: string, timezone?: string) {
 
 function Conversation({member, id}: {member:Membership;id:string}) {
   const [cursor,setCursor]=useState<string>();
-  const result=useRemote<Page<Message>&{handoff:Handoff}>(member,`/handoffs/${id}/messages${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`);
+  const result=useRemote<Page<Message>&{handoff:Handoff}>(member,`/handoffs/${id}/messages${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`,{refetchInterval:cursor?undefined:CONVERSATION_REFRESH_MS});
   const action=useAction(member);const [text,setText]=useState('');
   const list=useRef<HTMLOListElement>(null);
   const handoff=result.data?.handoff;
@@ -40,20 +44,26 @@ export function InboxPage({member}:{member:Membership}) {
   const [selected,setSelected]=useState<string>();const [create,setCreate]=useState(false);
   const [phone,setPhone]=useState('');const [queue,setQueue]=useState('');const [reason,setReason]=useState('patient_request');
   const [cursor,setCursor]=useState<string>();
-  const result=useRemote<Page<Handoff>>(member,`/inbox?limit=100${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`);const queues=useRemote<Page<Queue>>(member,'/queues');const action=useAction(member);
+  const result=useRemote<Page<Handoff>>(member,`/inbox?limit=100${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`,{refetchInterval:cursor?undefined:LIST_REFRESH_MS});const queues=useRemote<Page<Queue>>(member,'/queues');const action=useAction(member);
   const waiting=result.data?.items.filter(row=>row.status==='waiting').length ?? 0;
   return <><PageHeader title={pt.inbox} description={pt.inboxDescription}><button className="secondary" disabled={result.isFetching} onClick={()=>void result.refetch()}><Icon name="refresh" size={16}/>{pt.refresh}</button><button onClick={()=>{action.clearError();setCreate(true);}}><Icon name="plus" size={16}/>{pt.newHandoff}</button></PageHeader><Feedback action={action}/>
     <div className={`inbox-layout${selected?' has-selection':''}`}><aside className="inbox-list" aria-label={pt.conversations}>
       <div className="inbox-list-header"><h2>{pt.conversations}</h2>{waiting>0 && <span className="badge status-waiting">{waiting} {pt.statuses.waiting.toLowerCase()}</span>}</div>
+      {!cursor&&<UpdatedAt at={result.dataUpdatedAt} timezone={member.timezone}/>}
       {result.isPending?<Loading/>:result.isError?<Failure error={result.error}/>:!result.data.items.length?<Empty icon="inbox"/>:result.data.items.map(row=><button key={row.id} className={`conversation-card ${selected===row.id?'selected':''}`} aria-current={selected===row.id?'true':undefined} onClick={()=>setSelected(row.id)}><span className="conversation-card-top"><strong>{row.queue_name}</strong><time dateTime={row.created_at}>{time(row.created_at, member.timezone)}</time></span><span>{pt.reasons[row.reason_code]}</span><span className="conversation-card-bottom"><Status value={row.status}/>{row.assigned_to_me && <span className="mine">{pt.assignedToMe}</span>}</span></button>)}
       {cursor&&<button className="secondary" onClick={()=>setCursor(undefined)}>{pt.back}</button>}{result.data?.next_cursor&&<button className="secondary" onClick={()=>setCursor(result.data.next_cursor??undefined)}>{pt.following}</button>}</aside>
       {selected?<div className="conversation-column"><button type="button" className="text-button back-to-list" onClick={()=>setSelected(undefined)}><Icon name="left" size={16}/>{pt.conversations}</button><Conversation key={selected} member={member} id={selected}/></div>:<section className="conversation-panel conversation-placeholder"><Empty icon="chat">{pt.selectConversation}</Empty></section>}
     </div>
-    {create && <Modal title={pt.newHandoff} onClose={()=>setCreate(false)}><Feedback action={action} errorsOnly/><form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
-      const contact=await action.send<{contact_id:string}>('/contacts',{phone});
-      const result=await action.send<Handoff&{notice?:string}>('/handoffs',{contact_id:contact.contact_id,queue_id:queue,reason_code:reason});
-      setSelected(result.id);setCreate(false);setPhone('');if(result.notice)action.setNotice(result.notice);
-    },pt.handoffCreated);}}><Label text={pt.contactPhone}><input type="tel" autoComplete="off" placeholder="+5511999999999" required maxLength={16} value={phone} onChange={event=>setPhone(event.target.value)}/></Label><Label text={pt.queue}><select required value={queue} onChange={event=>setQueue(event.target.value)}><option value="">{pt.select}</option>{queues.data?.items.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></Label>
+    {create && <Modal title={pt.newHandoff} onClose={()=>setCreate(false)}><Feedback action={action} errorsOnly/><form className="form-grid" onSubmit={event=>{event.preventDefault();void (async()=>{
+      const created=await action.run(async()=>{
+        const contact=await action.send<{contact_id:string}>('/contacts',{phone});
+        return action.send<Handoff&{notice?:string}>('/handoffs',{contact_id:contact.contact_id,queue_id:queue,reason_code:reason});
+      });
+      if(!created)return;
+      setSelected(created.id);setCreate(false);setPhone('');
+      // O aviso de fora do expediente da fila complementa a confirmação, em vez de ser sobrescrito por ela.
+      action.setNotice(created.notice?`${pt.handoffCreated} ${created.notice}`:pt.handoffCreated);
+    })();}}><Label text={pt.contactPhone}><input type="tel" autoComplete="off" placeholder="+5511999999999" required maxLength={16} value={phone} onChange={event=>setPhone(event.target.value)}/></Label><Label text={pt.queue}><select required value={queue} onChange={event=>setQueue(event.target.value)}><option value="">{pt.select}</option>{queues.data?.items.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></Label>
       <Label text={pt.reason}><select value={reason} onChange={event=>setReason(event.target.value)}>{Object.entries(pt.reasons).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Label><div className="form-actions wide"><button type="button" className="secondary" onClick={()=>setCreate(false)}>{pt.cancel}</button><button disabled={action.busy}>{pt.create}</button></div></form></Modal>}
   </>;
 }
