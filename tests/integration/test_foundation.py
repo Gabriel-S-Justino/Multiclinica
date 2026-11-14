@@ -26,7 +26,6 @@ from tests.integration.conftest import sign_in
         ("admin", {"professional", "other_professional"}),
         ("collaborator", {"professional"}),
         ("reception", {"professional"}),
-        ("superadmin", set()),
     ],
 )
 def test_endpoint_rbac_and_tenant_isolation(foundation, role, visible):
@@ -40,6 +39,28 @@ def test_endpoint_rbac_and_tenant_isolation(foundation, role, visible):
             200 if name in visible else 404
         )
     assert client.get("/v1/audit").status_code == 403  # no verified MFA in test-only password flow
+
+
+def test_superadmin_cannot_enter_clinic_workspace(foundation):
+    settings, _, ids, password, client = foundation
+    response = client.post(
+        "/v1/auth/login",
+        json={"login": "superadmin@test.invalid", "password": password},
+        headers={"Origin": settings.public_origin},
+    )
+    assert response.status_code == 200, response.text
+    headers = {
+        "Origin": settings.public_origin,
+        "X-CSRF-Token": client.cookies.get("__Host-clinic_csrf"),
+    }
+    selected = client.post(
+        "/v1/auth/active-membership",
+        json={"membership_id": str(ids["superadmin_member"])},
+        headers=headers,
+    )
+    assert selected.status_code == 401
+    for name in ("professional", "other_professional", "foreign_professional"):
+        assert client.get(f"/v1/professionals/{ids[name]}").status_code in {401, 403, 404}
 
 
 def test_csrf_rotation_revocation_and_tenant_input(foundation):

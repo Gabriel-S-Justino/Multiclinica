@@ -119,9 +119,11 @@ def portal(foundation, request):
     }
     with Session(admin) as db, db.begin():
         for role, secret in secrets.items():
-            db.get(User, h.ids[role]).mfa_secret = (
-                cipher(settings).encrypt(secret.encode()).decode()
-            )
+            user = db.get(User, h.ids[role])
+            user.mfa_secret = cipher(settings).encrypt(secret.encode()).decode()
+            # Cada teste usa um segredo novo; zerar o passo evita que um código usado em um
+            # teste anterior, na mesma janela de 30 s, seja tratado como reuso.
+            user.last_totp_step = -1
         db.add(PlatformOperator(user_id=h.ids["superadmin"], active=True))
         db.add(
             ClinicPolicy(

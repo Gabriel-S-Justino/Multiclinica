@@ -87,10 +87,13 @@ export function Services({member}: {member:Membership}) {
     {name:'name',label:pt.name,group:pt.generalGroup},{name:'display_order',label:pt.displayOrder,type:'number',group:pt.generalGroup},
     {name:'service_queue_id',label:pt.serviceQueue,type:'select',optional:true,options:queues.data?.items.map(item=>({value:item.id,label:item.name})),group:pt.generalGroup},
     {name:'active',label:pt.active,type:'checkbox',group:pt.generalGroup},{name:'requires_professional',label:pt.requiresProfessional,type:'checkbox',initial:true,group:pt.generalGroup},
-    ...([['duration_minutes',pt.duration],['step_minutes',pt.step],['buffer_before',pt.bufferBefore],['buffer_after',pt.bufferAfter],['min_notice_minutes',pt.minNotice],
-      ['cancellation_notice_minutes',pt.cancelNotice],['reschedule_notice_minutes',pt.rescheduleNotice],['horizon_days',pt.horizon],['max_reschedules',pt.maxReschedules],['hold_ttl_minutes',pt.holdTtl]] as const).map(([name,label]):Field=>({name,label,type:'number',when:clinical,group:pt.rulesGroup})),
+    // Valores iniciais comuns em clínicas; a clínica revisa e confirma antes de liberar o agendamento.
+    ...([['duration_minutes',pt.duration,30,pt.durationHint],['step_minutes',pt.step,30,pt.stepHint],['buffer_before',pt.bufferBefore,0,pt.bufferHint],['buffer_after',pt.bufferAfter,0,pt.bufferHint],
+      ['min_notice_minutes',pt.minNotice,120,pt.noticeHint],['cancellation_notice_minutes',pt.cancelNotice,1440,pt.noticeHint],['reschedule_notice_minutes',pt.rescheduleNotice,1440,pt.noticeHint],
+      ['horizon_days',pt.horizon,60,pt.horizonHint],['max_reschedules',pt.maxReschedules,2,pt.maxReschedulesHint],['hold_ttl_minutes',pt.holdTtl,10,pt.holdTtlHint]] as const)
+      .map(([name,label,initial,hint]):Field=>({name,label,type:'number',initial,hint,when:clinical,group:pt.rulesGroup})),
     {name:'required_resource_ids',label:pt.requiredResources,type:'multi',optional:true,options:catalog.data?.resources.map(item=>({value:item.id,label:item.name})),when:clinical,group:pt.rulesGroup},
-    {name:'requires_birth_date',label:pt.requiresBirthDate,type:'checkbox',when:clinical,group:pt.confirmGroup},{name:'policy_validated',label:pt.policyValidated,type:'checkbox',when:clinical,group:pt.confirmGroup},
+    {name:'requires_birth_date',label:pt.requiresBirthDate,type:'checkbox',when:clinical,group:pt.confirmGroup},{name:'policy_validated',label:pt.policyValidated,type:'checkbox',hint:pt.policyValidatedHint,when:clinical,group:pt.confirmGroup},
   ];
   return <><PageHeader title={pt.services} description={pt.servicesDescription}><button onClick={()=>{action.clearError();setEditing({});}}><Icon name="plus" size={16}/>{pt.newService}</button></PageHeader><Feedback action={action}/>
     {editing && <Editor key={String(editing.id??'new')} title={editing.id?`${pt.edit}: ${String(editing.name)}`:pt.newService} fields={fields} initial={editing} busy={action.busy} action={action} onCancel={()=>setEditing(null)} onSave={values=>void action.run(async()=>{
