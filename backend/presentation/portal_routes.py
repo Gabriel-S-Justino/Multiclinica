@@ -17,6 +17,7 @@ from backend.application.portal_commands import (
     BreakGlassDecision,
     ChannelProvisionDraft,
     ClinicPolicyDraft,
+    DeliveryDraft,
     ExceptionDraft,
     HandoffDraft,
     IntegrationDraft,
@@ -556,6 +557,15 @@ def register_portal_routes(
     ) -> dict[str, Any]:
         keyed(request, command)
         return Integrations(ctx).provision_channel(command)
+
+    @app.post("/v1/integrations/whatsapp/delivery")
+    def whatsapp_delivery(
+        command: DeliveryDraft,
+        request: Request,
+        ctx: PortalContext = Depends(context),
+    ) -> dict[str, Any]:
+        keyed(request, command)
+        return Integrations(ctx).set_delivery(command)
 
     @app.post("/v1/integrations/{provider}/verify")
     def verify_integration(

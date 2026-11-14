@@ -215,10 +215,25 @@ def test_webhook_auth_before_parse_routing_and_persistent_dedup(messaging):
     envelope = p.envelope()
     for _ in range(3):
         assert p.post(envelope).status_code == 200
+    # Eventos de outra conta são ignorados sem derrubar o lote (a Meta não reenvia).
     envelope["entry"][0]["id"] = "foreign"
-    assert p.post(envelope).status_code == 400
+    envelope["entry"][0]["changes"][0]["value"]["messages"][0]["id"] = str(uuid4())
+    assert p.post(envelope).status_code == 200
+    # Estados novos de entrega também não derrubam o lote.
+    status = p.envelope()
+    status["entry"][0]["changes"][0]["value"]["messages"] = []
+    status["entry"][0]["changes"][0]["value"]["statuses"] = [{"id": "x", "status": "deleted"}]
+    assert p.post(status).status_code == 200
+    # Assinatura com caracteres fora de ASCII é recusada sem erro interno.
+    odd = p.client.post(
+        f"/v1/webhooks/whatsapp/{p.channel_id}",
+        content=json.dumps(p.envelope()).encode(),
+        headers={"X-Hub-Signature-256": "sha256=\xe7".encode("latin-1")},
+    )
+    assert odd.status_code == 401
     with Session(p.h.admin) as db:
         assert db.scalar(select(func.count()).select_from(InboundJob)) == 1
+        assert db.get(MessagingChannel, p.channel_id).last_event_at is not None
     url = f"/v1/webhooks/whatsapp/{p.channel_id}"
     assert (
         p.client.get(
@@ -662,3 +677,47 @@ def test_ai_quota_charges_used_tokens_and_limits_conversations_per_month(messagi
         assert third is not None
         # Com a terceira ainda em andamento (4096 reservados), a quarta passaria do limite.
         assert reserve("request-0004") is None
+
+
+def test_unmatched_status_never_blocks_patient_messages(messaging):
+    p = messaging
+    status = p.envelope()
+    value = status["entry"][0]["changes"][0]["value"]
+    value["messages"] = []
+    value["statuses"] = [{"id": "wamid.desconhecido", "status": "delivered"}]
+    assert p.post(status).status_code == 200
+    assert process_one(p.h.runtime, p.h.settings, p.channel_id)
+    # O status aguarda uma nova tentativa, mas a mensagem do paciente segue na frente.
+    assert p.post(p.envelope("menu")).status_code == 200
+    assert process_one(p.h.runtime, p.h.settings, p.channel_id)
+    with Session(p.h.admin) as db:
+        jobs = {job.kind: job for job in db.scalars(select(InboundJob))}
+        assert jobs["message"].status == "done"
+        assert jobs["status"].status == "pending"
+    for _ in range(2):
+        with Session(p.h.admin) as db, db.begin():
+            db.scalar(select(InboundJob).where(InboundJob.kind == "status")).available_at = (
+                datetime.now(UTC) - timedelta(seconds=1)
+            )
+        assert process_one(p.h.runtime, p.h.settings, p.channel_id)
+    with Session(p.h.admin) as db:
+        job = db.scalar(select(InboundJob).where(InboundJob.kind == "status"))
+        assert (job.status, job.error_code) == ("done", "status_unmatched")
+
+
+def test_worker_heartbeat_and_expired_credential_cleanup(messaging):
+    from backend.application.maintenance import heartbeat, purge_expired
+    from backend.infrastructure.messaging_models import WorkerHeartbeat
+
+    p = messaging
+    heartbeat(p.h.runtime)
+    heartbeat(p.h.runtime)
+    removed = purge_expired(p.h.runtime)
+    assert set(removed) == {
+        "portal_sessions",
+        "mfa_challenges",
+        "recovery_tokens",
+        "rate_limit_buckets",
+    }
+    with Session(p.h.admin) as db:
+        assert db.scalar(select(func.count()).select_from(WorkerHeartbeat)) == 1

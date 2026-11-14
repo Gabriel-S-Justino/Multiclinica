@@ -108,6 +108,8 @@ class IntegrationConfig(ClinicRecord):
     credentials_ciphertext: Mapped[str] = mapped_column(String(32768))
     version: Mapped[int] = mapped_column(default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    verified_version: Mapped[int | None] = mapped_column()
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PlatformOperator(Base):

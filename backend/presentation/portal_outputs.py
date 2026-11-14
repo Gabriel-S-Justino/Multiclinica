@@ -88,6 +88,20 @@ class MessagePage(Page[MessageView]):
     handoff: HandoffView
 
 
+class IntegrationStep(View):
+    code: str
+    done: bool
+
+
+class IntegrationHealth(View):
+    worker_online: bool
+    worker_seen_at: str | None
+    last_event_at: str | None
+    webhook_verified_at: str | None
+    failed_deliveries: int
+    credentials_rejected: bool
+
+
 class IntegrationView(View):
     provider: str
     configured: bool
@@ -100,6 +114,8 @@ class IntegrationView(View):
     webhook_url: str | None
     send_enabled: bool
     pending_steps: list[str]
+    steps: list[IntegrationStep]
+    health: IntegrationHealth | None
 
 
 class IntegrationsView(View):

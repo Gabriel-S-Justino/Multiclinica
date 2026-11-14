@@ -243,6 +243,12 @@ class ChannelProvisionDraft(Versioned):
     """No secrets or caller-supplied tenant IDs are accepted."""
 
 
+class DeliveryDraft(Mutation):
+    """Ativar ou pausar o envio pelo WhatsApp da clínica ativa."""
+
+    enabled: bool
+
+
 class TenantDraft(Versioned):
     name: str = Field(min_length=1, max_length=120)
     timezone: str = Field(min_length=1, max_length=64)

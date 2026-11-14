@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import re
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from backend.application.portal_access import PortalContext, PortalError
-from backend.application.portal_commands import ChannelProvisionDraft, IntegrationDraft
+from backend.application.portal_commands import (
+    ChannelProvisionDraft,
+    DeliveryDraft,
+    IntegrationDraft,
+)
 from backend.infrastructure.fields import seal, unseal
-from backend.infrastructure.messaging_models import MessagingChannel
+from backend.infrastructure.messaging_models import (
+    Dispatch,
+    MessagingChannel,
+    MessagingSession,
+    WorkerHeartbeat,
+)
 from backend.infrastructure.portal_models import IntegrationConfig, ServiceQueue
 from backend.infrastructure.security import PASSWORDS, token
 
@@ -39,11 +51,22 @@ PROVIDER_FIELDS = {
 }
 AI_CREDENTIALS = {"api_key", "provider", "model"}
 AI_POLICY = {"data_policy_reference", "contract_reference", "monthly_tokens", "conversation_tokens"}
-SECRET_FIELDS = {"access_token", "app_secret", "verify_token", "api_key"}
+SECRET_FIELDS = {"access_token", "app_secret", "api_key"}
+# O token de verificação do webhook é gerado pelo servidor e mostrado ao dono para ser
+# colado na Meta; não dá acesso a nada além do aperto de mão do webhook.
 METADATA_FIELDS = {
-    "whatsapp": {"phone_number_id", "account_id", "graph_version", "queue_id"},
+    "whatsapp": {"phone_number_id", "account_id", "graph_version", "queue_id", "verify_token"},
     "ai": {"provider", "model", "enabled", *AI_POLICY},
 }
+# Versão da Graph API usada quando a clínica não informa outra.
+DEFAULT_GRAPH_VERSION = "v25.0"
+WORKER_ONLINE_WINDOW = timedelta(minutes=2)
+FAILURE_WINDOW = timedelta(days=7)
+
+
+def appsecret_proof(access_token: str, app_secret: str) -> str:
+    """Prova exigida pela Meta que confirma, numa só chamada, o token e o segredo do app."""
+    return hmac.new(app_secret.encode(), access_token.encode(), hashlib.sha256).hexdigest()
 
 
 class Integrations:
@@ -77,8 +100,39 @@ class Integrations:
             raise PortalError("invalid_integration_fields", 422)
         return result
 
+    def _health(self, channel: MessagingChannel | None, moment: datetime) -> dict[str, Any]:
+        seen = self.db.scalar(select(func.max(WorkerHeartbeat.seen_at)))
+        failures: dict[str, int] = {}
+        if channel is not None:
+            failures = {
+                str(code): int(total)
+                for code, total in self.db.execute(
+                    select(Dispatch.error_code, func.count())
+                    .join(MessagingSession, MessagingSession.id == Dispatch.session_id)
+                    .where(
+                        Dispatch.tenant_id == self.ctx.tenant_id,
+                        MessagingSession.channel_id == channel.id,
+                        Dispatch.status.in_(("dead", "unknown", "failed")),
+                        Dispatch.available_at >= moment - FAILURE_WINDOW,
+                    )
+                    .group_by(Dispatch.error_code)
+                ).tuples()
+            }
+        return {
+            "worker_online": bool(seen and moment - seen <= WORKER_ONLINE_WINDOW),
+            "worker_seen_at": seen.isoformat() if seen else None,
+            "last_event_at": channel.last_event_at.isoformat()
+            if channel and channel.last_event_at
+            else None,
+            "webhook_verified_at": channel.webhook_verified_at.isoformat()
+            if channel and channel.webhook_verified_at
+            else None,
+            "failed_deliveries": sum(failures.values()),
+            "credentials_rejected": bool(failures.get("provider_unauthorized")),
+        }
+
     def list(self) -> dict[str, Any]:
-        self.ctx.admin()
+        moment = self.ctx.admin()
         channels = list(
             self.db.scalars(
                 select(MessagingChannel).where(MessagingChannel.tenant_id == self.ctx.tenant_id)
@@ -97,35 +151,40 @@ class Integrations:
             values = self._values(row, provider)
             required = AI_CREDENTIALS if provider == "ai" else PROVIDER_FIELDS[provider]
             complete = all(values.get(key) for key in required)
+            verified = bool(row and row.verified_version == row.version)
             metadata = {key: values[key] for key in METADATA_FIELDS[provider] if key in values}
-            steps: list[str] = []
-            if not complete:
-                steps.append("fill_credentials")
+            # Etapas na ordem em que o dono as conclui; cada uma informa se já está pronta.
+            steps: list[tuple[str, bool]] = [("fill_credentials", complete)]
+            steps.append(("verify_credentials", verified))
             if provider == "whatsapp":
-                if not channel:
-                    steps.append("provision_channel")
-                elif (
-                    values.get("phone_number_id") != channel.phone_number_id
-                    or values.get("account_id") != channel.account_id
-                    or values.get("queue_id") != str(channel.default_queue_id)
-                ):
-                    steps.append("channel_mismatch")
-                if not channel or not channel.send_enabled:
-                    steps.append("enable_delivery")
-                steps.append("configure_worker")
-                steps.append("verify_meta")
+                mismatch = bool(
+                    channel
+                    and (
+                        values.get("phone_number_id") != channel.phone_number_id
+                        or values.get("account_id") != channel.account_id
+                        or values.get("queue_id") != str(channel.default_queue_id)
+                    )
+                )
+                steps.append(("provision_channel", channel is not None and not mismatch))
+                if mismatch:
+                    steps.append(("channel_mismatch", False))
+                steps.append(
+                    (
+                        "verify_meta",
+                        bool(channel and (channel.webhook_verified_at or channel.last_event_at)),
+                    )
+                )
+                steps.append(("enable_delivery", bool(channel and channel.send_enabled)))
             else:
-                if not all(values.get(key) for key in AI_POLICY):
-                    steps.append("approve_data_policy")
-                if values.get("enabled") != "true":
-                    steps.append("enable_ai_adapter")
+                steps.append(("approve_data_policy", all(values.get(key) for key in AI_POLICY)))
+                steps.append(("enable_ai_adapter", values.get("enabled") == "true"))
             response.append(
                 {
                     "provider": provider,
                     "configured": row is not None,
                     "version": row.version if row else 0,
                     "updated_at": row.updated_at.isoformat() if row else None,
-                    "verification_status": "not_verified",
+                    "verification_status": "verified" if verified else "not_verified",
                     "setup_complete": complete,
                     "metadata": metadata,
                     "channel_id": str(channel.id) if provider == "whatsapp" and channel else None,
@@ -137,7 +196,9 @@ class Integrations:
                     "send_enabled": bool(channel.send_enabled)
                     if provider == "whatsapp" and channel
                     else False,
-                    "pending_steps": steps,
+                    "pending_steps": [code for code, done in steps if not done],
+                    "steps": [{"code": code, "done": done} for code, done in steps],
+                    "health": self._health(channel, moment) if provider == "whatsapp" else None,
                 }
             )
         return {"items": response}
@@ -219,6 +280,10 @@ class Integrations:
         previous = self._values(row, provider)
         provided = {key: value.get_secret_value() for key, value in command.credentials.items()}
         values = {**previous, **provided}
+        if provider == "whatsapp":
+            # O dono não precisa escolher a versão da API nem inventar o token do webhook.
+            values.setdefault("graph_version", DEFAULT_GRAPH_VERSION)
+            values.setdefault("verify_token", token())
         self._validate_values(provider, values)
         if (
             provider == "whatsapp"
@@ -267,6 +332,10 @@ class Integrations:
         values = self._values(row, "whatsapp")
         if not all(values.get(key) for key in PROVIDER_FIELDS["whatsapp"]):
             raise PortalError("integration_incomplete", 409)
+        # O número só é vinculado depois que a Meta confirmou que ele pertence à conta
+        # informada: impede que uma clínica bloqueie o número de outra.
+        if row.verified_version != row.version:
+            raise PortalError("verification_required", 409)
         self._validate_values("whatsapp", values)
         if self.db.scalar(
             select(MessagingChannel.id).where(MessagingChannel.tenant_id == self.ctx.tenant_id)
@@ -301,27 +370,7 @@ class Integrations:
             },
         )
 
-    def verify(self, provider: str) -> dict[str, str]:
-        # Test only metadata/key access. This does not activate WhatsApp sends or AI.
-        self.ctx.validate(roles={"admin"}, recent=True)
-        if provider not in PROVIDER_FIELDS:
-            raise PortalError("invalid_integration_fields", 422)
-        values = self._values(self._config(provider), provider)
-        required = AI_CREDENTIALS if provider == "ai" else PROVIDER_FIELDS[provider]
-        if not all(values.get(key) for key in required):
-            raise PortalError("integration_incomplete", 409)
-        if provider == "whatsapp":
-            self._validate_values(provider, values)
-            url = (
-                f"https://graph.facebook.com/{values['graph_version']}/{values['phone_number_id']}"
-            )
-            headers = {"Authorization": f"Bearer {values['access_token']}"}
-            params = {"fields": "id,display_phone_number,verified_name"}
-        else:
-            self._validate_values(provider, values)
-            url = f"https://api.openai.com/v1/models/{values['model']}"
-            headers = {"Authorization": f"Bearer {values['api_key']}"}
-            params = None
+    def _get(self, url: str, headers: dict[str, str], params: dict[str, str] | None) -> Any:
         try:
             with httpx.Client(
                 timeout=httpx.Timeout(8, connect=3),
@@ -333,8 +382,89 @@ class Integrations:
             raise PortalError("provider_unavailable", 503) from None
         if result.status_code != 200:
             raise PortalError("provider_verification_failed", 409)
-        return {
-            "provider": provider,
-            "status": "credentials_verified",
-            "message": "Conexão de leitura verificada; o atendimento ainda não está ativado.",
-        }
+        try:
+            return result.json()
+        except ValueError:
+            raise PortalError("provider_verification_failed", 409) from None
+
+    def verify(self, provider: str) -> dict[str, str]:
+        """Confere as credenciais no provedor e registra a verificação desta versão."""
+        moment = self.ctx.validate(roles={"admin"}, recent=True)
+        if provider not in PROVIDER_FIELDS:
+            raise PortalError("invalid_integration_fields", 422)
+        row = self._config(provider)
+        values = self._values(row, provider)
+        required = AI_CREDENTIALS if provider == "ai" else PROVIDER_FIELDS[provider]
+        if row is None or not all(values.get(key) for key in required):
+            raise PortalError("integration_incomplete", 409)
+        self._validate_values(provider, values)
+        if provider == "whatsapp":
+            base = f"https://graph.facebook.com/{values['graph_version']}"
+            headers = {"Authorization": f"Bearer {values['access_token']}"}
+            proof = appsecret_proof(values["access_token"], values["app_secret"])
+            # 1) O token e o segredo do app são válidos (a Meta recusa uma prova inválida).
+            self._get(
+                f"{base}/{values['phone_number_id']}",
+                headers,
+                {"fields": "id,display_phone_number,verified_name", "appsecret_proof": proof},
+            )
+            # 2) O número pertence à conta do WhatsApp Business informada.
+            numbers = self._get(
+                f"{base}/{values['account_id']}/phone_numbers",
+                headers,
+                {"fields": "id", "limit": "100", "appsecret_proof": proof},
+            )
+            listed = {
+                str(item.get("id"))
+                for item in (numbers.get("data") if isinstance(numbers, dict) else None) or []
+                if isinstance(item, dict)
+            }
+            if values["phone_number_id"] not in listed:
+                raise PortalError("phone_not_in_account", 409)
+        else:
+            self._get(
+                f"https://api.openai.com/v1/models/{values['model']}",
+                {"Authorization": f"Bearer {values['api_key']}"},
+                None,
+            )
+        row.verified_version, row.verified_at = row.version, moment
+        self.ctx.audit(f"integration.{provider}_verified", row.id)
+        return {"provider": provider, "status": "credentials_verified"}
+
+    def set_delivery(self, command: DeliveryDraft) -> dict[str, Any]:
+        """Ativa ou pausa o envio de mensagens pelo WhatsApp da clínica."""
+        self.ctx.admin(write=True)
+        replay = self.ctx.replay("integration.whatsapp.delivery", command)
+        if replay is not None:
+            return replay
+        channel = self.db.scalar(
+            select(MessagingChannel).where(MessagingChannel.tenant_id == self.ctx.tenant_id)
+        )
+        if channel is None:
+            raise PortalError("channel_unavailable", 409)
+        if command.enabled:
+            row = self._config("whatsapp")
+            values = self._values(row, "whatsapp")
+            if (
+                row is None
+                or row.verified_version != row.version
+                or values.get("phone_number_id") != channel.phone_number_id
+                or values.get("account_id") != channel.account_id
+                or values.get("queue_id") != str(channel.default_queue_id)
+            ):
+                raise PortalError("verification_required", 409)
+            if not (channel.webhook_verified_at or channel.last_event_at):
+                raise PortalError("webhook_not_verified", 409)
+        changed = self.db.scalar(
+            text("SELECT public.set_clinic_whatsapp_delivery(:channel, :enabled)"),
+            {"channel": channel.id, "enabled": command.enabled},
+        )
+        if not changed:
+            raise PortalError("delivery_unavailable", 409)
+        self.ctx.audit(
+            "messaging.delivery_enabled" if command.enabled else "messaging.delivery_paused",
+            channel.id,
+        )
+        return self.ctx.save(
+            "integration.whatsapp.delivery", command, {"send_enabled": command.enabled}
+        )

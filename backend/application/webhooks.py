@@ -1,7 +1,7 @@
 import hmac
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -59,10 +59,12 @@ def challenge(
     expected = credentials(db, settings, channel)["verify_token"]
     if (
         mode != "subscribe"
-        or not hmac.compare_digest(expected, supplied)
+        or not hmac.compare_digest(expected.encode(), supplied.encode("utf-8", "replace"))
         or not re.fullmatch(r"[0-9]{1,100}", value)
     ):
         raise HTTPException(403, "verification_failed")
+    # A Meta confirmou o endereço do webhook: o portal mostra a etapa como concluída.
+    channel.webhook_verified_at = datetime.now(UTC)
     return value
 
 
@@ -71,8 +73,10 @@ def parse_events(payload: Any, channel: MessagingChannel) -> list[tuple[str, str
     if not isinstance(payload, dict) or payload.get("object") != "whatsapp_business_account":
         raise ValueError
     for entry in payload["entry"]:
+        # Eventos de outra conta ou de outro número não pertencem a este canal: são
+        # ignorados sem descartar os eventos válidos do mesmo lote.
         if entry["id"] != channel.account_id:
-            raise ValueError
+            continue
         for change in entry["changes"]:
             if change.get("field") != "messages":
                 continue
@@ -81,7 +85,7 @@ def parse_events(payload: Any, channel: MessagingChannel) -> list[tuple[str, str
                 value.get("messaging_product") != "whatsapp"
                 or value["metadata"]["phone_number_id"] != channel.phone_number_id
             ):
-                raise ValueError
+                continue
             for message in value.get("messages", []):
                 message_id, sender = message["id"], message["from"]
                 if (
@@ -110,12 +114,10 @@ def parse_events(payload: Any, channel: MessagingChannel) -> list[tuple[str, str
                 )
             for status in value.get("statuses", []):
                 message_id, state = status["id"], status["status"]
-                if (
-                    not isinstance(message_id, str)
-                    or len(message_id) > 150
-                    or state not in {"sent", "delivered", "read", "failed"}
-                ):
+                if not isinstance(message_id, str) or len(message_id) > 150:
                     raise ValueError
+                if state not in {"sent", "delivered", "read", "failed"}:
+                    continue  # novos estados da Meta não interrompem o lote
                 events.append(
                     (f"status:{state}:{message_id}", "status", {"id": message_id, "status": state})
                 )
@@ -136,6 +138,7 @@ def ingest(
         events = parse_events(json.loads(raw), channel)
     except (ValueError, TypeError, KeyError, IndexError, OverflowError):
         raise HTTPException(400, "invalid_webhook") from None
+    channel.last_event_at = now
     for key, kind, value in events:
         row_id = uuid4()
         encrypted = seal(

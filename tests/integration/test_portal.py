@@ -1037,3 +1037,68 @@ def test_platform_operator_cannot_remove_or_rename_another_operator(portal):
     with Session(p.h.admin) as db:
         user = db.get(User, p.h.ids["admin"])
         assert user.active and user.login == "admin@test.invalid"
+
+
+def test_owner_connects_whatsapp_end_to_end_from_portal(portal, monkeypatch):
+    import httpx
+
+    p = portal
+    p.login()
+    owned = {"numbers": ["100"]}
+
+    def fake_get(self, url, headers=None, params=None):
+        assert params and "appsecret_proof" in params
+        if url.endswith("/phone_numbers"):
+            return httpx.Response(200, json={"data": [{"id": n} for n in owned["numbers"]]})
+        return httpx.Response(200, json={"id": "100"})
+
+    monkeypatch.setattr(httpx.Client, "get", fake_get)
+    credentials = {
+        "phone_number_id": "100",
+        "account_id": "200",
+        "queue_id": str(p.h.ids["queue"]),
+        "access_token": "synthetic-access-" + uuid4().hex,  # pragma: allowlist secret
+        "app_secret": "synthetic-secret-" + uuid4().hex,  # pragma: allowlist secret
+    }
+    p.call(
+        "PUT",
+        "/v1/integrations/whatsapp",
+        p.command(version=0, credentials=credentials),
+        expected=200,
+    )
+
+    def whatsapp():
+        items = p.call("GET", "/v1/integrations", expected=200).json()["items"]
+        return next(item for item in items if item["provider"] == "whatsapp")
+
+    state = whatsapp()
+    assert state["metadata"]["graph_version"] == "v25.0" and state["metadata"]["verify_token"]
+    # O número só é vinculado depois da verificação na Meta.
+    p.call("POST", "/v1/integrations/whatsapp/channel", p.command(version=1), expected=409)
+    owned["numbers"] = ["999"]
+    p.call("POST", "/v1/integrations/whatsapp/verify", {}, expected=409)
+    owned["numbers"] = ["100"]
+    p.call("POST", "/v1/integrations/whatsapp/verify", {}, expected=200)
+    assert whatsapp()["verification_status"] == "verified"
+    channel = p.call(
+        "POST", "/v1/integrations/whatsapp/channel", p.command(version=1), expected=200
+    ).json()
+    monkeypatch.undo()  # o cliente de teste também herda de httpx.Client
+    # Ativar exige que a Meta tenha confirmado o webhook.
+    p.call("POST", "/v1/integrations/whatsapp/delivery", p.command(enabled=True), expected=409)
+    token = whatsapp()["metadata"]["verify_token"]
+    handshake = p.client.get(
+        f"/v1/webhooks/whatsapp/{channel['channel_id']}",
+        params={"hub.mode": "subscribe", "hub.verify_token": token, "hub.challenge": "12345"},
+    )
+    assert handshake.status_code == 200 and handshake.text == "12345"
+    p.login()
+    p.call("POST", "/v1/integrations/whatsapp/delivery", p.command(enabled=True), expected=200)
+    state = whatsapp()
+    assert state["send_enabled"] and all(step["done"] for step in state["steps"])
+    assert state["pending_steps"] == []
+    assert state["health"]["webhook_verified_at"] is not None
+    p.call("POST", "/v1/integrations/whatsapp/delivery", p.command(enabled=False), expected=200)
+    assert not whatsapp()["send_enabled"]
+    p.login("reception")
+    p.call("POST", "/v1/integrations/whatsapp/delivery", p.command(enabled=True), expected=403)

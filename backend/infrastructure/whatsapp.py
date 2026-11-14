@@ -22,7 +22,10 @@ class WhatsAppProvider(Protocol):
 
 def verify_signature(raw: bytes, signature: str, app_secret: str) -> bool:
     expected = "sha256=" + hmac.new(app_secret.encode(), raw, hashlib.sha256).hexdigest()
-    return bool(app_secret) and hmac.compare_digest(expected, signature)
+    # Comparar bytes evita TypeError (e erro 500) com cabeçalhos fora de ASCII.
+    return bool(app_secret) and hmac.compare_digest(
+        expected.encode(), signature.encode("utf-8", "replace")
+    )
 
 
 @dataclass(frozen=True)
@@ -53,12 +56,18 @@ class CloudAPI:
                         "text": {"body": text, "preview_url": False},
                     },
                 )
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            # A conexão nem chegou a ser aberta: a Meta não recebeu nada, então é seguro reenviar.
+            raise ProviderFailure("connection_failed", retryable=True) from None
         except httpx.HTTPError:
             raise ProviderFailure("delivery_unknown", ambiguous=True) from None
         if response.status_code == 429:
             raise ProviderFailure("provider_throttled", retryable=True)
         if response.status_code >= 500:
             raise ProviderFailure("delivery_unknown", ambiguous=True)
+        if response.status_code in {401, 403}:
+            # Token expirado ou sem permissão: o dono precisa trocar a credencial.
+            raise ProviderFailure("provider_unauthorized")
         if response.status_code != 200:
             raise ProviderFailure("provider_rejected")
         try:

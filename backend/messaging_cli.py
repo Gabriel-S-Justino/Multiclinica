@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Engine, create_engine, func, select, text
 from sqlalchemy.orm import Session
 
+from backend.application.maintenance import heartbeat, purge_expired
 from backend.application.messaging_worker import process_one, send_one
 from backend.application.webhooks import credentials
 from backend.config import Settings
@@ -37,9 +38,21 @@ def active_channels(engine: Engine) -> list[UUID]:
         )
 
 
+MAINTENANCE_INTERVAL_SECONDS = 600
+
+
 def run_worker(engine: Engine, settings: Settings, limit: int, interval: int) -> None:
     logger = logging.getLogger("clinic.messaging")
+    last_maintenance = 0.0
     while True:
+        try:
+            heartbeat(engine)
+            if time.monotonic() - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
+                removed = purge_expired(engine)
+                last_maintenance = time.monotonic()
+                logger.info("Limpeza de credenciais vencidas: %s", removed)
+        except Exception:
+            logger.error("Falha na manutenção periódica")
         try:
             channels = active_channels(engine)
         except Exception:

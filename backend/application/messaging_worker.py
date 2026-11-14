@@ -32,6 +32,8 @@ from backend.infrastructure.scheduling_models import (
 from backend.infrastructure.security import digest
 from backend.infrastructure.whatsapp import CloudAPI, ProviderFailure, WhatsAppProvider
 
+STATUS_MATCH_ATTEMPTS = 3
+
 
 def lock_channel(db: Session, channel_id: UUID) -> MessagingChannel:
     channel = channel_for(db, channel_id)
@@ -178,18 +180,36 @@ def process_one(engine: Engine, settings: Settings, channel_id: UUID) -> bool:
     with transaction(engine) as db:
         channel = lock_channel(db, channel_id)
         moment = now(db)
-        # Earliest event first. A delayed retry blocks later events in this channel.
+        # Status de entrega não dependem de ordem: os disponíveis são tratados primeiro e
+        # nunca seguram as mensagens dos pacientes.
         job = db.scalar(
             select(InboundJob)
             .where(
                 InboundJob.channel_id == channel.id,
                 InboundJob.tenant_id == channel.tenant_id,
                 InboundJob.status == "pending",
+                InboundJob.kind == "status",
+                InboundJob.available_at <= moment,
             )
             .order_by(InboundJob.sequence)
             .limit(1)
             .with_for_update()
         )
+        if job is None:
+            # Mensagens seguem a ordem de chegada: uma nova tentativa atrasada segura as
+            # mensagens seguintes do mesmo canal para não responder fora de ordem.
+            job = db.scalar(
+                select(InboundJob)
+                .where(
+                    InboundJob.channel_id == channel.id,
+                    InboundJob.tenant_id == channel.tenant_id,
+                    InboundJob.status == "pending",
+                    InboundJob.kind != "status",
+                )
+                .order_by(InboundJob.sequence)
+                .limit(1)
+                .with_for_update()
+            )
         if not job or job.available_at > moment:
             return False
         job.attempts += 1
@@ -207,7 +227,13 @@ def process_one(engine: Engine, settings: Settings, channel_id: UUID) -> bool:
                 )
                 if job.kind == "status":
                     if not callback(db, channel, payload):
-                        raise SchedulingError("status_unmatched")
+                        if job.attempts < STATUS_MATCH_ATTEMPTS:
+                            # O status pode chegar antes de gravarmos o retorno do envio.
+                            raise SchedulingError("status_unmatched")
+                        # Sem mensagem correspondente (ex.: enviada pelo app da Meta):
+                        # encerra sem bloquear nada.
+                        job.status, job.error_code = "done", "status_unmatched"
+                        return True
                 else:
                     provider_at = datetime.fromtimestamp(payload["timestamp"], UTC)
                     if provider_at > moment + timedelta(minutes=5):
@@ -310,7 +336,11 @@ def bridge_replies(db: Session, channel: MessagingChannel, moment: datetime) -> 
             )
         )
         if not session:
-            continue  # no inbound user window; do not invent a recipient/window
+            # Sem conversa iniciada pelo contato no WhatsApp não há janela de envio; a
+            # resposta fica registrada como bloqueada em vez de esperar para sempre.
+            message.delivery_status = "blocked"
+            event.status = "done"
+            continue
         if not db.scalar(
             select(Dispatch.id).where(
                 Dispatch.tenant_id == channel.tenant_id, Dispatch.message_id == message.id

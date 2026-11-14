@@ -49,7 +49,11 @@ def downgrade() -> None:
         op.execute(f"DROP TABLE {table}")
     op.execute("REVOKE UPDATE(delivery_status) ON messages FROM clinic_runtime")
     op.execute("REVOKE UPDATE(status) ON outbox FROM clinic_runtime")
+    # FORCE RLS também vale para o dono da tabela; sem suspendê-la, o DELETE não remove
+    # nada e a nova restrição de papéis falha.
+    op.execute("ALTER TABLE memberships NO FORCE ROW LEVEL SECURITY")
     op.execute("DELETE FROM memberships WHERE role='messaging'")
+    op.execute("ALTER TABLE memberships FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE memberships DROP CONSTRAINT membership_role")
     op.execute(
         "ALTER TABLE memberships ADD CONSTRAINT membership_role CHECK (role IN ('collaborator','reception','admin','superadmin'))"

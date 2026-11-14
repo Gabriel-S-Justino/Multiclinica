@@ -101,7 +101,36 @@ def test_credential_settings_are_sealed_and_never_exposed():
     assert "provision_channel" in whatsapp["pending_steps"]
     assert values["access_token"] not in str(exposed)
     assert values["app_secret"] not in str(exposed)
-    assert values["verify_token"] not in str(exposed)
+    # O token do webhook é mostrado ao dono para ser colado na Meta.
+    assert whatsapp["metadata"]["verify_token"] == values["verify_token"]
+    assert whatsapp["verification_status"] == "not_verified"
+    assert [step["code"] for step in whatsapp["steps"]] == [
+        "fill_credentials",
+        "verify_credentials",
+        "provision_channel",
+        "verify_meta",
+        "enable_delivery",
+    ]
+    assert whatsapp["steps"][0]["done"] and not whatsapp["steps"][1]["done"]
+
+
+def test_whatsapp_defaults_api_version_and_webhook_token():
+    ctx = new_context()
+    integration = Integrations(ctx)
+    values = {
+        "phone_number_id": "1234567890",
+        "account_id": "9876543210",
+        "queue_id": str(ctx.db.queue.id),
+        "access_token": "synthetic-access-token-012345",
+        "app_secret": "synthetic-app-secret-012345",  # pragma: allowlist secret (fixture sintética)
+    }
+    integration.save(
+        "whatsapp", IntegrationDraft(version=0, idempotency_key=str(uuid4()), credentials=values)
+    )
+    whatsapp = next(item for item in integration.list()["items"] if item["provider"] == "whatsapp")
+    assert whatsapp["setup_complete"]
+    assert whatsapp["metadata"]["graph_version"] == "v25.0"
+    assert len(whatsapp["metadata"]["verify_token"]) >= 20
 
 
 def test_metadata_update_preserves_existing_secrets():
@@ -130,5 +159,9 @@ def test_metadata_update_preserves_existing_secrets():
     ai = next(item for item in exposed if item["provider"] == "ai")
     assert ai["metadata"]["model"] == "next-model"
     assert ai["setup_complete"] is True
-    assert ai["pending_steps"] == ["approve_data_policy", "enable_ai_adapter"]
+    assert ai["pending_steps"] == [
+        "verify_credentials",
+        "approve_data_policy",
+        "enable_ai_adapter",
+    ]
     assert "synthetic-api-token-000000" not in str(exposed)

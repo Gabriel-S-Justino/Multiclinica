@@ -30,6 +30,8 @@ class MessagingChannel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=False)
     send_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     graph_version: Mapped[str | None] = mapped_column(String(12))
+    webhook_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     idle_minutes: Mapped[int] = mapped_column(default=30)
     ambiguity_limit: Mapped[int] = mapped_column(default=3)
 
@@ -109,3 +111,11 @@ class AIUsage(ClinicRecord):
     used_tokens: Mapped[int] = mapped_column(default=0)
     status: Mapped[str] = mapped_column(String(20), default="reserved")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WorkerHeartbeat(Base):
+    """Último sinal de vida do processador de mensagens (sem dados de clínica)."""
+
+    __tablename__ = "worker_heartbeats"
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
