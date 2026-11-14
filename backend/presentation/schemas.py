@@ -58,6 +58,17 @@ class AuthenticatedPasswordChange(Command):
     new_password: SecretStr = Field(min_length=12, max_length=128)
 
 
+class AuthenticatorResetStart(Command):
+    login: str = Field(min_length=3, max_length=254)
+    reset_code: TextToken
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
+class AuthenticatorResetComplete(AuthenticatorResetStart):
+    authenticator_key: SecretStr = Field(min_length=32, max_length=32)
+    code: str = Field(pattern=r"^[0-9]{6}$")
+
+
 class RecoveryRequest(Command):
     login: str = Field(min_length=3, max_length=254)
 

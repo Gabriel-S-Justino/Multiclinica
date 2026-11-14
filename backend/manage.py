@@ -9,6 +9,7 @@ import pyotp
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from backend.application import auth
 from backend.config import Settings
 from backend.infrastructure.db import set_tenant
 from backend.infrastructure.models import Membership, RecoveryToken, Tenant, User
@@ -19,7 +20,14 @@ from backend.infrastructure.security import PASSWORDS, cipher, digest, token
 def main() -> None:
     parser = argparse.ArgumentParser(description="Administração local controlada")
     parser.add_argument(
-        "command", choices=["bootstrap", "bootstrap-platform", "provision-user", "issue-recovery"]
+        "command",
+        choices=[
+            "bootstrap",
+            "bootstrap-platform",
+            "provision-user",
+            "issue-recovery",
+            "issue-mfa-reset",
+        ],
     )
     parser.add_argument("--login", required=True)
     parser.add_argument("--tenant-name")
@@ -75,14 +83,18 @@ def main() -> None:
         else:
             if not user:
                 raise SystemExit("Identidade não encontrada")
-            raw = token()
-            db.add(
-                RecoveryToken(
-                    token_hash=digest(settings, "recovery", raw),
-                    user_id=user.id,
-                    expires_at=datetime.now(UTC) + timedelta(minutes=15),
+            if args.command == "issue-mfa-reset":
+                # Código de 48 h para configurar um autenticador novo (exige também a senha).
+                raw = auth.issue_mfa_reset(db, settings, user.id)
+            else:
+                raw = token()
+                db.add(
+                    RecoveryToken(
+                        token_hash=digest(settings, "recovery", raw),
+                        user_id=user.id,
+                        expires_at=datetime.now(UTC) + timedelta(minutes=15),
+                    )
                 )
-            )
             # Explicit operator-only delivery, intentionally not stdout/logs.
             destination = getpass.getpass("Arquivo privado para token (fora do repositório): ")
             from pathlib import Path

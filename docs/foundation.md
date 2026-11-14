@@ -50,6 +50,8 @@ Runtime não cria/altera clínicas, papéis ou profissionais; só atualiza hash 
 
 Sessão: 30 min inativa/8 h absoluta, token opaco HMAC no banco, rotação ao selecionar clínica, revogação no logout/recuperação, MFA obrigatório fora dos testes. Tokens de recuperação de 15 min/uso único podem ser emitidos por CLI operador após verificar identidade: `python -m backend.manage issue-recovery --login SEU_LOGIN`. Saída em arquivo privado fora do repositório, nunca em stdout. Entrega automatizada por e-mail ainda não configurada; endpoint público informa contato com administrador, sem fingir envio.
 
+Troca de celular ou perda do autenticador: depois de confirmar a identidade da pessoa, emita um código de reconfiguração com `python -m backend.manage issue-mfa-reset --login SEU_LOGIN`. O código vale 48 horas e uma única vez, e também é gravado em arquivo privado. Na tela de entrada, a pessoa escolhe "Reconfigurar autenticador", informa login, senha e o código, escaneia o QR Code novo e confirma com o código de 6 dígitos. As sessões anteriores são encerradas e o registro vai para a auditoria da plataforma.
+
 Limites compartilhados: janela fixa de 5 min, 30 tentativas por IP/escopo e 8 por identidade/desafio/escopo. Contadores commitam mesmo se autenticação falhar. IP vem da conexão direta; validar proxy confiável antes de produção. Limpeza de sessões/desafios/tokens/buckets expirados é pendência operacional antes de produção; não depende dela para negar uso expirado.
 
 ## Testes

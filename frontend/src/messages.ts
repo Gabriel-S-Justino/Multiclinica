@@ -71,6 +71,10 @@ export const pt = {
   aiReferences:'Referências internas (opcional)', dataPolicyReference:'Referência da política de dados', contractReference:'Referência do contrato com o provedor',
   policyAcceptedOn:'Aceite registrado no portal em', openaiTerms:'Termos de uso da OpenAI API aceitos pela clínica',
   aiEnable:'Usar a IA no atendimento pelo WhatsApp', aiSaved:'Configuração da IA salva e chave confirmada pela OpenAI.',
+  resetTitle:'Reconfigurar autenticador', resetIntro:'Use quando trocar de celular ou quando a equipe Multiclinica pedir. Você precisa da sua senha e do código de reconfiguração recebido da equipe.',
+  resetCode:'Código de reconfiguração', resetCodeHint:'Vale por 48 horas e pode ser usado uma vez.', // pragma: allowlist secret (rótulos da interface)
+  resetScanTitle:'Escaneie o novo QR Code', resetScanHint:'No aplicativo autenticador, adicione uma conta nova e escaneie o código. Depois, apague a entrada antiga da Multiclinica no aplicativo.',
+  resetConfirmTitle:'Confirme o código', resetConfirmHint:'Digite o código de 6 dígitos exibido agora na entrada nova.', resetFinish:'Concluir e entrar',
   lastUpdated:'Atualizado', autoRefresh:'Atualiza automaticamente', conversations:'Conversas', openedAt:'Aberto às',
   sendShortcut:'Ctrl + Enter para registrar.',
   title:'Multiclinica', subtitle:'Acesso à equipe', workspace:'ATENDIMENTO · EQUIPE',

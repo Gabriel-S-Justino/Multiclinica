@@ -34,6 +34,8 @@ from backend.infrastructure.security import digest
 from backend.presentation.portal_routes import register_portal_routes
 from backend.presentation.schemas import (
     AuthenticatedPasswordChange,
+    AuthenticatorResetComplete,
+    AuthenticatorResetStart,
     CompleteInvitationActivation,
     InvitationActivation,
     Login,
@@ -561,6 +563,43 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
             "status": "received",
             "message": "Se necessário, procure o administrador para recuperar o acesso.",
         }
+
+    @app.post("/v1/auth/mfa/reset/setup")
+    def authenticator_reset_setup(
+        command: AuthenticatorResetStart,
+        request: Request,
+        db: Session = Depends(db_session, scope="function"),
+    ) -> dict[str, str]:
+        login_origin(request)
+        throttle(request, "mfa-reset", command.login)
+        key = auth.begin_mfa_reset(
+            db, settings, command.login, command.reset_code, command.password.get_secret_value()
+        )
+        return {"authenticator_key": key}
+
+    @app.post("/v1/auth/mfa/reset", response_model=None)
+    def authenticator_reset(
+        command: AuthenticatorResetComplete,
+        request: Request,
+        response: Response,
+        db: Session = Depends(db_session, scope="function"),
+    ) -> dict[str, str] | JSONResponse:
+        login_origin(request)
+        throttle(request, "mfa-reset", command.login)
+        try:
+            raw, csrf = auth.complete_mfa_reset(
+                db,
+                settings,
+                command.login,
+                command.reset_code,
+                command.password.get_secret_value(),
+                command.authenticator_key.get_secret_value(),
+                command.code,
+            )
+        except auth.SecondFactorRejected:
+            return error_response(request, 422, "activation_mfa_invalid")
+        cookies(response, raw, csrf)
+        return {"status": "authenticated"}
 
     @app.post("/v1/auth/recovery/confirm", status_code=204)
     def recovery_confirm(

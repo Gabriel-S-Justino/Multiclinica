@@ -1022,6 +1022,47 @@ def test_mfa_locks_account_after_repeated_wrong_codes(portal):
     assert accepted.status_code == 200, accepted.text
 
 
+def test_authenticator_reset_with_one_time_code(portal):
+    from backend.application import auth
+
+    p = portal
+    origin = {"Origin": p.h.settings.public_origin}
+    with Session(p.h.admin) as db, db.begin():
+        raw = auth.issue_mfa_reset(db, p.h.settings, p.h.ids["reception"])
+    p.client.cookies.clear()
+    proof = {"login": "reception@test.invalid", "reset_code": raw, "password": p.password}
+    mistaken = proof | {"password": p.password + "x"}
+    wrong = p.client.post("/v1/auth/mfa/reset/setup", json=mistaken, headers=origin)
+    assert wrong.status_code == 401
+    forged = p.client.post(
+        "/v1/auth/mfa/reset/setup", json=proof | {"reset_code": "x" * 43}, headers=origin
+    )
+    assert forged.status_code == 401
+    setup = p.client.post("/v1/auth/mfa/reset/setup", json=proof, headers=origin)
+    assert setup.status_code == 200, setup.text
+    key = setup.json()["authenticator_key"]
+    totp = pyotp.TOTP(key)
+    bad = f"{(int(totp.now()) + 1) % 1_000_000:06d}"
+    rejected = p.client.post(
+        "/v1/auth/mfa/reset", json=proof | {"authenticator_key": key, "code": bad}, headers=origin
+    )
+    assert rejected.status_code == 422
+    done = p.client.post(
+        "/v1/auth/mfa/reset",
+        json=proof | {"authenticator_key": key, "code": totp.now()},
+        headers=origin,
+    )
+    assert done.status_code == 200, done.text
+    assert p.client.get("/v1/auth/session").status_code == 200
+    # O código vale uma vez e o autenticador antigo deixa de funcionar.
+    p.client.cookies.clear()
+    again = p.client.post("/v1/auth/mfa/reset/setup", json=proof, headers=origin)
+    assert again.status_code == 401
+    with Session(p.h.admin) as db:
+        stored = db.get(User, p.h.ids["reception"]).mfa_secret
+        assert cipher(p.h.settings).decrypt(stored.encode()).decode() == key
+
+
 def test_platform_operator_cannot_remove_or_rename_another_operator(portal):
     p = portal
     with Session(p.h.admin) as db, db.begin():

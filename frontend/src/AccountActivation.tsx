@@ -25,7 +25,7 @@ export function ActivationCode({ code, onClose, hint = pt.activationShare }: {
   </Modal>;
 }
 
-function AuthenticatorQr({ login, secret }: { login: string; secret: string }) {
+export function AuthenticatorQr({ login, secret }: { login: string; secret: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -147,6 +147,71 @@ export function AccountActivation({ onAuthenticated }: { onAuthenticated: () => 
       </>}
       <button className="full" disabled={action.busy || mismatch}>
         {action.busy ? pt.loading : authenticatorKey ? pt.activateAccount : pt.activationStart}
+      </button>
+    </form>
+  </>;
+}
+
+/** Reconfiguração do autenticador com código de uso único emitido pela equipe Multiclinica. */
+export function AuthenticatorReset({ onAuthenticated }: { onAuthenticated: () => Promise<unknown> }) {
+  const action = useAction();
+  const [login, setLogin] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [authenticatorKey, setAuthenticatorKey] = useState('');
+  const [code, setCode] = useState('');
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const proof = { login: login.trim(), reset_code: resetCode.trim(), password };
+    void action.run(async () => {
+      if (!authenticatorKey) {
+        const setup = await api<{ authenticator_key: string }>('/auth/mfa/reset/setup', proof);
+        setAuthenticatorKey(setup.authenticator_key);
+        return;
+      }
+      await api('/auth/mfa/reset', { ...proof, authenticator_key: authenticatorKey, code });
+      setPassword(''); setResetCode(''); setCode(''); setAuthenticatorKey('');
+      await onAuthenticated();
+    });
+  }
+
+  return <>
+    <Feedback action={action} />
+    <form onSubmit={submit} className="activation-form">
+      {authenticatorKey ? <>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">1</span>{pt.resetScanTitle}</legend>
+          <p className="muted">{pt.resetScanHint}</p>
+          <AuthenticatorQr login={login} secret={authenticatorKey} />
+          <details className="manual-key">
+            <summary>{pt.activationManual}</summary>
+            <Label text={pt.activationAuthenticator} hint={pt.activationMfaHint}>
+              <input className="code-display" readOnly value={authenticatorKey} onFocus={event => event.target.select()} />
+            </Label>
+          </details>
+        </fieldset>
+        <fieldset className="activation-step">
+          <legend><span className="step-number" aria-hidden="true">2</span>{pt.resetConfirmTitle}</legend>
+          <Label text={pt.code} hint={pt.resetConfirmHint}>
+            <input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
+              maxLength={6} required autoFocus value={code} onChange={event => setCode(event.target.value)} />
+          </Label>
+        </fieldset>
+      </> : <>
+        <p className="note compact">{pt.resetIntro}</p>
+        <Label text={pt.login}>
+          <input autoComplete="username" minLength={3} maxLength={254} required value={login} onChange={event => setLogin(event.target.value)} />
+        </Label>
+        <Label text={pt.password}>
+          <input type="password" autoComplete="current-password" maxLength={128} required value={password} onChange={event => setPassword(event.target.value)} />
+        </Label>
+        <Label text={pt.resetCode} hint={pt.resetCodeHint}>
+          <input autoComplete="off" spellCheck={false} minLength={20} maxLength={128} required value={resetCode} onChange={event => setResetCode(event.target.value)} />
+        </Label>
+      </>}
+      <button className="full" disabled={action.busy}>
+        {action.busy ? pt.loading : authenticatorKey ? pt.resetFinish : pt.activationStart}
       </button>
     </form>
   </>;

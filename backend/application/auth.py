@@ -1,4 +1,5 @@
 import hmac
+import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -124,7 +125,11 @@ def verify_mfa(db: Session, settings: Settings, challenge_token: str, code: str)
     user = db.scalar(select(User).where(User.id == challenge.user_id).with_for_update())
     if not user or not user.active or not user.mfa_secret:
         raise AuthError
-    secret = cipher(settings).decrypt(user.mfa_secret.encode()).decode()
+    try:
+        secret = cipher(settings).decrypt(user.mfa_secret.encode()).decode()
+    except (InvalidToken, ValueError, TypeError):
+        # Segredo cifrado com outra chave: a conta precisa reconfigurar o autenticador.
+        raise AuthError from None
     if not second_factor_accepted(user, secret, code, now):
         raise SecondFactorRejected
     db.delete(challenge)
@@ -346,3 +351,93 @@ def complete_recovery(db: Session, settings: Settings, raw: str, password: str) 
     user.password_hash = PASSWORDS.hash(password)
     revoke_user_sessions(db, user.id)
     db.execute(delete(RecoveryToken).where(RecoveryToken.user_id == user.id))
+
+
+MFA_RESET_SCOPE = "mfa-reset"
+MFA_RESET_VALIDITY = timedelta(hours=48)
+
+
+def issue_mfa_reset(db: Session, settings: Settings, user_id: UUID) -> str:
+    """Emite um código de uso único para a pessoa configurar um autenticador novo."""
+    raw = token()
+    db.add(
+        RecoveryToken(
+            token_hash=digest(settings, MFA_RESET_SCOPE, raw),
+            user_id=user_id,
+            expires_at=datetime.now(UTC) + MFA_RESET_VALIDITY,
+        )
+    )
+    return raw
+
+
+def _mfa_reset_holder(
+    db: Session, settings: Settings, login_name: str, raw: str, password: str
+) -> tuple[User, RecoveryToken]:
+    # Exige as três coisas: o login, a senha atual e o código de uso único emitido pela
+    # equipe. Erros são sempre genéricos para não revelar qual delas falhou.
+    reset = db.scalar(
+        select(RecoveryToken)
+        .where(RecoveryToken.token_hash == digest(settings, MFA_RESET_SCOPE, raw))
+        .with_for_update()
+    )
+    user = db.scalar(select(User).where(User.login == login_name.lower()).with_for_update())
+    valid = verify_password(user.password_hash if user else DUMMY_HASH, password)
+    if (
+        not reset
+        or reset.expires_at <= datetime.now(UTC)
+        or not user
+        or reset.user_id != user.id
+        or not valid
+        or not user.active
+        or user.is_service
+        or user.deleted_at is not None
+    ):
+        raise AuthError
+    return user, reset
+
+
+def begin_mfa_reset(
+    db: Session, settings: Settings, login_name: str, raw: str, password: str
+) -> str:
+    _mfa_reset_holder(db, settings, login_name, raw, password)
+    return pyotp.random_base32(32)
+
+
+def complete_mfa_reset(
+    db: Session,
+    settings: Settings,
+    login_name: str,
+    raw: str,
+    password: str,
+    secret: str,
+    code: str,
+) -> tuple[str, str]:
+    user, reset = _mfa_reset_holder(db, settings, login_name, raw, password)
+    moment = datetime.now(UTC)
+    if not re.fullmatch(r"[A-Z2-7]{32}", secret) or not hmac.compare_digest(
+        pyotp.TOTP(secret).at(moment).encode(), code.encode()
+    ):
+        raise SecondFactorRejected
+    replaced = db.scalar(
+        text("SELECT public.reset_user_authenticator(:user, :token, :secret, :step)"),
+        {
+            "user": user.id,
+            "token": reset.token_hash,
+            "secret": cipher(settings).encrypt(secret.encode()).decode(),
+            "step": int(moment.timestamp()) // 30,
+        },
+    )
+    if not replaced:
+        raise AuthError
+    db.expire(user)
+    revoke_user_sessions(db, user.id)
+    db.add(
+        PlatformAudit(
+            actor_id=user.id,
+            action="auth.authenticator_reset",
+            resource_id=user.id,
+            correlation_id=uuid4(),
+            created_at=moment,
+        )
+    )
+    return create_session(db, settings, user.id, True)
