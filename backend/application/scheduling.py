@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -269,10 +269,13 @@ class Scheduler:
         unit_id: UUID,
         resources: list[UUID],
         now: datetime,
+        window: tuple[datetime, datetime],
         exclude_hold: UUID | None = None,
         exclude_appointment: UUID | None = None,
     ) -> list[Interval]:
+        """Períodos ocupados que tocam a janela consultada (não o histórico inteiro)."""
         result: list[Interval] = []
+        window_start, window_end = window
         resource_holds = select(BookingResource.hold_id).where(
             BookingResource.tenant_id == self.tenant_id,
             BookingResource.resource_id.in_(resources),
@@ -288,6 +291,8 @@ class Scheduler:
                 AppointmentHold.tenant_id == self.tenant_id,
                 AppointmentHold.state == "held",
                 AppointmentHold.expires_at > now,
+                AppointmentHold.occupied_end > window_start,
+                AppointmentHold.occupied_start < window_end,
                 or_(
                     AppointmentHold.professional_id == professional_id,
                     AppointmentHold.id.in_(resource_holds),
@@ -299,6 +304,8 @@ class Scheduler:
             select(Appointment).where(
                 Appointment.tenant_id == self.tenant_id,
                 Appointment.status.in_(ACTIVE_STATUSES),
+                Appointment.occupied_end > window_start,
+                Appointment.occupied_start < window_end,
                 or_(
                     Appointment.professional_id == professional_id,
                     Appointment.id.in_(resource_appointments),
@@ -311,6 +318,8 @@ class Scheduler:
         blocks = self.db.scalars(
             select(BlockedPeriod).where(
                 BlockedPeriod.tenant_id == self.tenant_id,
+                BlockedPeriod.ends_at > window_start,
+                BlockedPeriod.starts_at < window_end,
                 or_(BlockedPeriod.unit_id.is_(None), BlockedPeriod.unit_id == unit_id),
                 or_(
                     BlockedPeriod.professional_id.is_(None),
@@ -350,7 +359,19 @@ class Scheduler:
             service.step_minutes,
             service.buffer_before,
             service.buffer_after,
-            self._busy(professional_id, unit_id, resources, now, exclude_hold, exclude_appointment),
+            self._busy(
+                professional_id,
+                unit_id,
+                resources,
+                now,
+                # Um dia de folga em cada lado cobre intervalos e mudanças de horário.
+                (
+                    datetime.combine(day - timedelta(days=1), time(), tzinfo=zone),
+                    datetime.combine(day + timedelta(days=2), time(), tzinfo=zone),
+                ),
+                exclude_hold,
+                exclude_appointment,
+            ),
             now + timedelta(minutes=service.min_notice_minutes),
             now + timedelta(days=service.horizon_days),
         )

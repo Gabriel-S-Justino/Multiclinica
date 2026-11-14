@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import Engine, select, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from backend.application import auth, invitations, portal
@@ -284,6 +284,20 @@ def create_app(settings: Settings, engine: Engine | None = None) -> FastAPI:
     @app.exception_handler(PortalError)
     async def portal_error(request: Request, exc: PortalError) -> JSONResponse:
         return error_response(request, exc.status, exc.code)
+
+    @app.exception_handler(OperationalError)
+    async def database_busy(request: Request, exc: OperationalError) -> JSONResponse:
+        # Tempo limite de consulta ou de bloqueio, ou banco indisponível: pedir nova tentativa.
+        logger.warning(
+            json.dumps(
+                {
+                    "correlation_id": request.state.correlation_id,
+                    "event": "database_busy",
+                    "sqlstate": getattr(exc.orig, "sqlstate", None),
+                }
+            )
+        )
+        return error_response(request, 503, "service_busy")
 
     @app.exception_handler(IntegrityError)
     async def integrity_error(request: Request, exc: IntegrityError) -> JSONResponse:

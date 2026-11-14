@@ -10,6 +10,14 @@ depends_on = None
 ARCHIVE_FUNCTION = "public.archive_platform_user(uuid)"
 LOGIN_FUNCTION = "public.set_platform_user_login(uuid,text)"
 DELIVERY_FUNCTION = "public.set_clinic_whatsapp_delivery(uuid,boolean)"
+INDEXES = {
+    "appointments_tenant_start": "appointments (tenant_id, starts_at)",
+    "portal_sessions_user": "portal_sessions (user_id)",
+    "portal_sessions_membership": "portal_sessions (membership_id)",
+    "mfa_challenges_user": "mfa_challenges (user_id)",
+    "audit_logs_tenant_date": "audit_logs (tenant_id, created_at)",
+    "inbound_jobs_pending": "inbound_jobs (channel_id, status, kind, sequence)",
+}
 
 
 def upgrade() -> None:
@@ -106,9 +114,14 @@ def upgrade() -> None:
     """)
     op.execute(f"REVOKE ALL ON FUNCTION {DELIVERY_FUNCTION} FROM PUBLIC")
     op.execute(f"GRANT EXECUTE ON FUNCTION {DELIVERY_FUNCTION} TO clinic_runtime")
+    # Índices para as consultas mais frequentes (agenda, sessões, auditoria e filas).
+    for name, ddl in INDEXES.items():
+        op.execute(f"CREATE INDEX {name} ON {ddl}")
 
 
 def downgrade() -> None:
+    for name in INDEXES:
+        op.execute(f"DROP INDEX {name}")
     op.execute(f"DROP FUNCTION {DELIVERY_FUNCTION}")
     op.execute("DROP TABLE worker_heartbeats")
     op.execute(
