@@ -88,13 +88,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Mfa V1 Auth Mfa Verify Post"
-                }
+                "schema": {}
               }
             }
           },
@@ -1196,6 +1190,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationAcceptance"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3557,6 +3561,58 @@
         ]
       }
     },
+    "/v1/integrations/whatsapp/delivery": {
+      "post": {
+        "summary": "Whatsapp Delivery",
+        "operationId": "whatsapp_delivery_v1_integrations_whatsapp_delivery_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Whatsapp Delivery V1 Integrations Whatsapp Delivery Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
     "/v1/integrations/{provider}/verify": {
       "post": {
         "summary": "Verify Integration",
@@ -5610,6 +5666,27 @@
         ],
         "title": "ContactRequest"
       },
+      "DeliveryDraft": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+            "title": "Idempotency Key"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "enabled"
+        ],
+        "title": "DeliveryDraft",
+        "description": "Ativar ou pausar o envio pelo WhatsApp da clínica ativa."
+      },
       "ExceptionDraft": {
         "properties": {
           "idempotency_key": {
@@ -5972,7 +6049,7 @@
               "writeOnly": true
             },
             "type": "object",
-            "maxProperties": 7,
+            "maxProperties": 8,
             "minProperties": 1,
             "title": "Credentials",
             "writeOnly": true
@@ -5986,6 +6063,85 @@
           "credentials"
         ],
         "title": "IntegrationDraft"
+      },
+      "IntegrationHealth": {
+        "properties": {
+          "worker_online": {
+            "type": "boolean",
+            "title": "Worker Online"
+          },
+          "worker_seen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Seen At"
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          },
+          "webhook_verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Verified At"
+          },
+          "failed_deliveries": {
+            "type": "integer",
+            "title": "Failed Deliveries"
+          },
+          "credentials_rejected": {
+            "type": "boolean",
+            "title": "Credentials Rejected"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "worker_online",
+          "worker_seen_at",
+          "last_event_at",
+          "webhook_verified_at",
+          "failed_deliveries",
+          "credentials_rejected"
+        ],
+        "title": "IntegrationHealth"
+      },
+      "IntegrationStep": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "done"
+        ],
+        "title": "IntegrationStep"
       },
       "IntegrationView": {
         "properties": {
@@ -6059,6 +6215,23 @@
             },
             "type": "array",
             "title": "Pending Steps"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntegrationHealth"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6074,7 +6247,9 @@
           "channel_id",
           "webhook_url",
           "send_enabled",
-          "pending_steps"
+          "pending_steps",
+          "steps",
+          "health"
         ],
         "title": "IntegrationView"
       },
@@ -6094,6 +6269,21 @@
           "items"
         ],
         "title": "IntegrationsView"
+      },
+      "InvitationAcceptance": {
+        "properties": {
+          "activation_code": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[0-9a-f]{64}$",
+            "title": "Activation Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activation_code"
+        ],
+        "title": "InvitationAcceptance"
       },
       "InvitationActivation": {
         "properties": {

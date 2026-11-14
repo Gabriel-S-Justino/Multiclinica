@@ -51,7 +51,7 @@ export const pt = {
   metaWhereToFind:'Você encontra estes dados em developers.facebook.com, no seu app, em WhatsApp > Configuração da API.',
   phoneNumberIdHint:'Número de identificação do telefone, não o número em si.', accountIdHint:'Identificação da conta do WhatsApp Business (WABA).',
   accessTokenHint:'Use um token permanente de Usuário do Sistema, com as permissões whatsapp_business_messaging e whatsapp_business_management.',
-  appSecretHint:'Em Configurações do app > Básico > Chave secreta do app.', defaultQueueHint:'Conversas encaminhadas para atendimento humano entram nesta fila.',
+  appSecretHint:'Em Configurações do app > Básico > Chave secreta do app.', defaultQueueHint:'Conversas encaminhadas para atendimento humano entram nesta fila.', // pragma: allowlist secret (rótulos da interface)
   graphVersionHint:'Deixe em branco para usar a versão recomendada.',
   whatsappVerified:'Conexão confirmada pela Meta: o número pertence à conta informada.',
   linkHint:'Reserva este número para a sua clínica na Multiclinica. O envio continua desligado até o último passo.',
@@ -62,7 +62,7 @@ export const pt = {
   editConnection:'Alterar dados da conexão',
   pauseToEdit:'Para trocar os dados ou o token, pause o envio no final desta seção.',
   aiIntro:'A IA ajuda a entender pedidos escritos livremente, como "quero marcar uma consulta". Ela nunca agenda, cancela ou lê dados de saúde: só indica a opção do menu.',
-  aiOn:'Ativa', aiOff:'Desligada', configureAi:'Configurar IA', apiKeyHint:'Chave da sua conta em platform.openai.com > API keys.',
+  aiOn:'Ativa', aiOff:'Desligada', configureAi:'Configurar IA', apiKeyHint:'Chave da sua conta em platform.openai.com > API keys.', // pragma: allowlist secret (rótulos da interface)
   aiModelHint:'Nome exato de um modelo liberado na sua conta da OpenAI.',
   monthlyInterpretations:'Interpretações por mês', monthlyInterpretationsHint:'Limite total da clínica no mês. Ao atingir, o menu numérico continua funcionando normalmente.',
   patientInterpretations:'Interpretações por paciente no mês', patientInterpretationsHint:'Evita que um único contato consuma o limite da clínica.',

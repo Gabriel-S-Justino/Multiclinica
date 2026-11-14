@@ -9,4 +9,5 @@ Cada clínica configura sua conta do WhatsApp Business e sua chave da OpenAI em 
 - [Portal e permissões](docs/users-and-permissions.md)
 - [Contrato atual da API](docs/api/openapi.json)
 - [Operação e recuperação](docs/operations.md)
+- [Processador de mensagens (worker)](docs/worker-deployment.md)
 - [Privacidade e incidentes](docs/privacy-operations.md)

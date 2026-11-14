@@ -4,7 +4,7 @@ O Admin configura credenciais e vincula o número no portal. O webhook valida a 
 
 ## Executor
 
-Execute em um serviço supervisionado, com reinício automático e as mesmas configurações de runtime do portal. Configure `DATABASE_URL`, `PUBLIC_ORIGIN`, `APP_ENV`, `TOKEN_KEY` e `FIELD_KEY` no gerenciador de segredos. Use a role de runtime. O executor consulta os canais ativos em cada ciclo.
+O passo a passo de implantação está em [processador de mensagens](worker-deployment.md). Execute em um serviço supervisionado, com reinício automático e as mesmas configurações de runtime do portal. Configure `DATABASE_URL`, `PUBLIC_ORIGIN`, `APP_ENV`, `TOKEN_KEY` e `FIELD_KEY` no gerenciador de segredos. Use a role de runtime. O executor consulta os canais ativos em cada ciclo.
 
 ```sh
 uv sync --frozen --no-dev --python 3.12
@@ -19,17 +19,12 @@ Em infraestrutura de contêineres, construa a imagem com `docker build -f Docker
 
 ## Ativar ou pausar envio
 
-A equipe usa o comando abaixo com `MIGRATION_DATABASE_URL` apenas no ambiente de administração, após conferir o webhook e os dados do canal. Habilite primeiro com número e destinatários de teste.
+O admin da clínica ativa e pausa o envio na tela de Integrações. Ativar só é possível depois que a Meta confirmou a conexão e o webhook. Pausar é sempre permitido e é o caminho para trocar um token: pause, informe o token novo, verifique e ative de novo. Durante a pausa, as mensagens recebidas continuam guardadas e as respostas pendentes aguardam a retomada.
 
-```sh
-uv run --frozen python -m backend.messaging_cli enable --channel-id UUID_DO_CANAL
-uv run --frozen python -m backend.messaging_cli disable --channel-id UUID_DO_CANAL
-```
-
-O canal começa com envio desligado. A habilitação confere credenciais presentes, fila ativa e correspondência dos identificadores. Confirme a entrega pelo retorno da Meta. Durante a pausa, o processamento de entrada continua e o envio pendente aguarda a retomada, sujeito à janela e à preferência do contato.
+Os comandos `enable` e `disable` continuam disponíveis para a equipe Multiclinica, com `MIGRATION_DATABASE_URL`, apenas em situações excepcionais.
 
 ## Falhas e limites
 
-Monitore atraso, jobs com falha, entregas de estado desconhecido e parada do executor. A reconciliação de entregas desconhecidas é feita com a Meta antes de qualquer reenvio. Falhas transitórias elegíveis têm retentativas limitadas. Fora da janela de atendimento, o sistema bloqueia texto livre. O projeto ainda não oferece templates proativos.
+Monitore atraso, jobs com falha, entregas de estado desconhecido e parada do executor. Falhas de conexão antes de chegar à Meta são reenviadas automaticamente. Entregas de estado desconhecido não são reenviadas, para não duplicar mensagens; a tela de Integrações mostra a quantidade de falhas dos últimos 7 dias. Falhas transitórias elegíveis têm retentativas limitadas. Fora da janela de atendimento, o sistema bloqueia texto livre. O projeto ainda não oferece templates proativos.
 
-Cada clínica tem um canal. A troca de conta, número ou fila exige rotação acompanhada. O comando legado `provision` fica disponível para operação administrativa. Para o fluxo habitual, vincule o canal no portal.
+Cada clínica tem um canal. A troca de conta, número ou fila exige rotação acompanhada. O número é vinculado pelo portal, depois da verificação na Meta.

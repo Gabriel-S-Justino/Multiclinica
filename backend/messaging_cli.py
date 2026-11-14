@@ -1,11 +1,16 @@
-"""Controlled channel provisioning and bounded worker invocations. No daemon in HTTP."""
+"""Processador de mensagens do WhatsApp (worker sempre ligado) e operações controladas.
+
+O processamento não roda nas funções HTTP da Vercel: este módulo é o processo contínuo
+hospedado à parte (ver Dockerfile.worker e docs/worker-deployment.md).
+"""
 
 import argparse
 import logging
 import os
 import re
+import signal
 import time
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import Engine, create_engine, func, select, text
 from sqlalchemy.orm import Session
@@ -21,9 +26,8 @@ from backend.infrastructure.messaging_models import (
     MessagingChannel,
     MessagingSession,
 )
-from backend.infrastructure.models import Membership, Tenant, User
+from backend.infrastructure.models import Tenant
 from backend.infrastructure.portal_models import ServiceQueue
-from backend.infrastructure.security import PASSWORDS, token
 
 
 def active_channels(engine: Engine) -> list[UUID]:
@@ -44,7 +48,17 @@ MAINTENANCE_INTERVAL_SECONDS = 600
 def run_worker(engine: Engine, settings: Settings, limit: int, interval: int) -> None:
     logger = logging.getLogger("clinic.messaging")
     last_maintenance = 0.0
-    while True:
+    stopping = False
+
+    def stop(_signum: int, _frame: object) -> None:
+        # A hospedagem envia SIGTERM ao reiniciar: termina o ciclo atual e sai sem
+        # interromper uma transação no meio.
+        nonlocal stopping
+        stopping = True
+
+    signal.signal(signal.SIGTERM, stop)
+    logger.info("Processador de mensagens iniciado")
+    while not stopping:
         try:
             heartbeat(engine)
             if time.monotonic() - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
@@ -60,6 +74,8 @@ def run_worker(engine: Engine, settings: Settings, limit: int, interval: int) ->
             time.sleep(interval)
             continue
         for channel_id in channels:
+            if stopping:
+                break
             for operation in (process_one, send_one):
                 try:
                     for _ in range(limit):
@@ -67,7 +83,11 @@ def run_worker(engine: Engine, settings: Settings, limit: int, interval: int) ->
                             break
                 except Exception:
                     logger.error("Falha no executor %s, canal %s", operation.__name__, channel_id)
-        time.sleep(interval)
+        for _ in range(interval):
+            if stopping:
+                break
+            time.sleep(1)
+    logger.info("Processador de mensagens encerrado")
 
 
 def set_delivery(db: Session, settings: Settings, channel_id: UUID, enabled: bool) -> None:
@@ -130,7 +150,7 @@ def print_status(engine: Engine) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Canal WhatsApp e worker transacional")
     parser.add_argument(
-        "command", choices=["provision", "process", "send", "worker", "enable", "disable", "status"]
+        "command", choices=["process", "send", "worker", "enable", "disable", "status"]
     )
     parser.add_argument("--channel-id", type=UUID)
     parser.add_argument("--tenant-id", type=UUID)
@@ -159,6 +179,7 @@ def main() -> None:
             return
         finally:
             engine.dispose()
+        return
     if args.command in {"enable", "disable"}:
         url = os.environ.get("MIGRATION_DATABASE_URL")
         if not url or not args.channel_id:
@@ -171,70 +192,7 @@ def main() -> None:
             engine.dispose()
         print("Estado de envio atualizado")
         return
-    if args.command == "provision":
-        url = os.environ.get("MIGRATION_DATABASE_URL")
-        if (
-            not url
-            or not args.tenant_id
-            or not args.queue_id
-            or not re.fullmatch(r"[0-9]{1,80}", args.phone_number_id or "")
-            or not re.fullmatch(r"[0-9]{1,80}", args.account_id or "")
-        ):
-            raise SystemExit("Informe clínica, fila, número, conta e credenciais de migração")
-        engine = create_engine(url, hide_parameters=True)
-        with Session(engine) as db, db.begin():
-            set_tenant(db, args.tenant_id)
-            queue, tenant = db.get(ServiceQueue, args.queue_id), db.get(Tenant, args.tenant_id)
-            if (
-                not tenant
-                or not tenant.active
-                or not queue
-                or queue.tenant_id != tenant.id
-                or not queue.active
-            ):
-                raise SystemExit("Clínica/fila inválidas")
-            if db.scalar(
-                select(MessagingChannel.id).where(MessagingChannel.tenant_id == tenant.id)
-            ):
-                raise SystemExit(
-                    "Canal já provisionado; alterar somente por procedimento de rotação"
-                )
-            user_id, member_id, channel_id = uuid4(), uuid4(), uuid4()
-            db.add(
-                User(
-                    id=user_id,
-                    login=f"service-{channel_id}@internal.invalid",
-                    password_hash=PASSWORDS.hash(token()),
-                    active=True,
-                    is_service=True,
-                )
-            )
-            db.flush()
-            db.add(
-                Membership(
-                    id=member_id,
-                    tenant_id=tenant.id,
-                    user_id=user_id,
-                    role="messaging",
-                    active=True,
-                )
-            )
-            db.flush()
-            db.add(
-                MessagingChannel(
-                    id=channel_id,
-                    tenant_id=tenant.id,
-                    phone_number_id=args.phone_number_id,
-                    account_id=args.account_id,
-                    actor_user_id=user_id,
-                    actor_membership_id=member_id,
-                    default_queue_id=queue.id,
-                    active=True,
-                    send_enabled=False,
-                )
-            )
-            print(f"Canal provisionado: {channel_id}; envio desativado")
-    else:
+    if args.command in {"process", "send"}:
         if not args.channel_id:
             raise SystemExit("Informe --channel-id")
         engine = make_engine(settings)

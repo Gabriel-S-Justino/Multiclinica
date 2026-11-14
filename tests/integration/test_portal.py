@@ -1004,8 +1004,9 @@ def test_mfa_locks_account_after_repeated_wrong_codes(portal):
         )
         assert result.status_code == 401
     # Bloqueada, a conta recusa até o código correto, em qualquer desafio.
+    totp = pyotp.TOTP(p.secrets["reception"])
     blocked = p.client.post(
-        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": valid}, headers=origin
+        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": totp.now()}, headers=origin
     )
     assert blocked.status_code == 401
     with Session(p.h.admin) as db:
@@ -1016,7 +1017,7 @@ def test_mfa_locks_account_after_repeated_wrong_codes(portal):
             seconds=1
         )
     accepted = p.client.post(
-        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": valid}, headers=origin
+        "/v1/auth/mfa/verify", json={"challenge": challenge(), "code": totp.now()}, headers=origin
     )
     assert accepted.status_code == 200, accepted.text
 
