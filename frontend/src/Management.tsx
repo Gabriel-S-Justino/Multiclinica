@@ -1,9 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { ActivationCode } from './AccountActivation';
-import { api } from './api';
 import { pt } from './locales';
 import { ConfirmButton, Empty, Failure, Feedback, Icon, Label, Loading, Modal, PageHeader, Status, formatInstant, formatLongDay, isoToZoned, minutes, useAction, useRemote, zonedToIso, useDiscardGuard } from './ui';
-import type { Catalog, EntityReceipt, IntegrationState, Membership, Page, Queue, RecordData, SupportRequest } from './types';
+import type { Catalog, EntityReceipt, Membership, Page, Queue, RecordData, SupportRequest } from './types';
 
 type Option = {value:string; label:string};
 export type Field = {name:string; label:string; type?:'text'|'email'|'number'|'checkbox'|'date'|'time'|'minutes'|'select'|'multi'|'datetime'; options?:Option[]; optional?:boolean; initial?:unknown; when?:{name:string; value:boolean}; group?:string; hint?:string};
@@ -213,58 +212,6 @@ export function Settings({member}: {member:Membership}) {
     <section className="panel"><div className="section-heading"><h2>{pt.queues}</h2><button className="secondary" onClick={()=>{action.clearError();setQueue(null);}}><Icon name="plus" size={16}/>{pt.newQueue}</button></div>{queues.isPending?<Loading/>:queues.isError?<Failure error={queues.error}/>:<Cards icon="inbox" rows={queues.data.items as unknown as RecordData[]} label="name" onEdit={row=>{action.clearError();setQueue(queues.data.items.find(item=>item.id===row.id)??null);}}>{row=>{const item=queues.data.items.find(queueRow=>queueRow.id===row.id);return item?<p className="muted">{pt.queueKinds[item.kind]??item.kind} · {item.hours.length?item.hours.map(window=>`${pt.weekdays[window.weekday].slice(0,3)} ${minutes(window.start_minute)} a ${minutes(window.end_minute)}`).join(', '):pt.noHours}</p>:null;}}</Cards>}</section>
     <section className="panel"><div className="section-heading"><h2>{pt.identityPolicy}</h2><button className="secondary" onClick={()=>{action.clearError();setEditing({kind:'policy',row:policy.data?.policy??{}});}}>{pt.edit}</button></div>
       {policy.isPending?<Loading/>:policy.data?.policy?<div className="record-card"><div className="record-main"><div className="record-title"><h3>{String(policy.data.policy.identity_policy_reference)}</h3><span className={`badge ${policy.data.policy.identity_policy_approved?'active':'status-pending'}`}>{policy.data.policy.identity_policy_approved?pt.approved:pt.pendingApproval}</span></div>{typeof policy.data.policy.verification_ttl_minutes==='number'&&<p className="muted">{pt.verificationTtl}: {policy.data.policy.verification_ttl_minutes}</p>}</div></div>:<p className="muted">{pt.noPolicy} {pt.policyHint}</p>}</section>
-  </>;
-}
-
-function CredentialForm({member,row,queues}: {member:Membership;row:IntegrationState;queues:Queue[]}) {
-  const action=useAction(member);
-  const [values,setValues]=useState<Record<string,string>>({...(row.provider==='ai'?{provider:'openai'}:{}),...row.metadata});
-  const [verification,setVerification]=useState('');
-  const whatsapp=row.provider==='whatsapp';
-  const secrets=whatsapp
-    ? [['access_token',pt.accessToken],['app_secret',pt.appSecret],['verify_token',pt.verifyToken]]
-    : [['api_key',pt.apiKey]];
-  const set=(name:string,value:string)=>setValues(old=>({...old,[name]:value}));
-  const activeQueues=queues.filter(item=>item.active);
-  const readyForVerify=row.setup_complete;
-  return <section className="panel" aria-labelledby={`integration-${row.provider}`}>
-    <div className="section-heading"><div className="integration-title"><span className="integration-icon" aria-hidden="true"><Icon name={whatsapp?'chat':'settings'} size={20}/></span><div><h2 id={`integration-${row.provider}`}>{whatsapp?pt.whatsapp:pt.ai}</h2><p className="muted">{readyForVerify?pt.readyToVerify:pt.setupIncomplete}</p></div></div><span className={`badge ${row.configured?'active':'inactive'}`}>{row.configured?pt.configured:pt.notConfigured}</span></div>
-    <Feedback action={action}/>{verification&&<p className="feedback success" role="status"><Icon name="check"/><span>{verification}</span></p>}
-    <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
-      const credentials=Object.fromEntries(Object.entries(values).filter(([,v])=>v.trim().length>0));
-      await action.send(`/integrations/${row.provider}`,{version:row.version,credentials},'PUT');
-      setValues(Object.fromEntries(Object.entries(values).filter(([key])=>!['access_token','app_secret','verify_token','api_key'].includes(key))));
-      setVerification('');
-    },pt.saved);}}>
-      {whatsapp?<><Label text={pt.phoneNumberId}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.phone_number_id??''} onChange={event=>set('phone_number_id',event.target.value)}/></Label>
-        <Label text={pt.accountId}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.account_id??''} onChange={event=>set('account_id',event.target.value)}/></Label>
-        <Label text={pt.graphVersion}><input pattern="v[0-9]{1,3}\.0" placeholder="v25.0" required maxLength={12} value={values.graph_version??''} onChange={event=>set('graph_version',event.target.value)}/></Label>
-        <Label text={pt.defaultQueue}><select required value={values.queue_id??''} onChange={event=>set('queue_id',event.target.value)}><option value="">{pt.selectActiveQueue}</option>{activeQueues.map(queue=><option key={queue.id} value={queue.id}>{queue.name}</option>)}</select></Label>
-        {activeQueues.length===0&&<p className="note wide">{pt.requireQueue}</p>}
-      </>:<><Label text={pt.aiProvider}><select required value={values.provider??'openai'} onChange={event=>set('provider',event.target.value)}><option value="openai">OpenAI API</option></select></Label>
-        <Label text={pt.aiModel}><input required minLength={1} maxLength={120} pattern="[A-Za-z0-9._-]{1,120}" placeholder={pt.aiModelPlaceholder} value={values.model??''} onChange={event=>set('model',event.target.value)}/></Label>
-        <Label text="Referência da política de dados aprovada"><input required={values.enabled==='true'} maxLength={254} value={values.data_policy_reference??''} onChange={event=>set('data_policy_reference',event.target.value)}/></Label>
-        <Label text="Referência do contrato com o provedor"><input required={values.enabled==='true'} maxLength={254} value={values.contract_reference??''} onChange={event=>set('contract_reference',event.target.value)}/></Label>
-        <Label text="Limite mensal de tokens"><input type="number" min={4096} max={1000000000} required={values.enabled==='true'} value={values.monthly_tokens??''} onChange={event=>set('monthly_tokens',event.target.value)}/></Label>
-        <Label text="Limite de tokens por conversa"><input type="number" min={4096} max={1000000000} required={values.enabled==='true'} value={values.conversation_tokens??''} onChange={event=>set('conversation_tokens',event.target.value)}/></Label>
-        <label className="check wide"><input type="checkbox" checked={values.enabled==='true'} onChange={event=>set('enabled',String(event.target.checked))}/>Usar IA para interpretar opções do menu</label></>}
-      {secrets.map(([name,label])=><Label key={name} text={label}><input type="password" autoComplete="new-password" minLength={12} maxLength={4096} required={!row.configured} placeholder={row.configured?pt.keepCredential:''} value={values[name]??''} onChange={event=>set(name,event.target.value)}/></Label>)}
-      <div className="form-actions wide"><button type="submit" disabled={action.busy||whatsapp&&activeQueues.length===0}>{pt.saveCredentials}</button><button type="button" className="secondary" disabled={action.busy||!readyForVerify} onClick={()=>void action.run(async()=>{await api(`/integrations/${row.provider}/verify`,{});setVerification(pt.verifiedCredentials);})}>{pt.verifyConnection}</button>
-        {whatsapp&&readyForVerify&&!row.channel_id&&<button type="button" disabled={action.busy||!verification} onClick={()=>void action.run(async()=>{await action.send('/integrations/whatsapp/channel',{version:row.version});setVerification('');},pt.provisionedChannel)}>{pt.provisionChannel}</button>}
-      </div>
-    </form>
-    {whatsapp&&row.channel_id&&<dl className="review-grid"><dt>{pt.channel}</dt><dd><code>{row.channel_id}</code></dd><dt>{pt.delivery}</dt><dd>{row.send_enabled?pt.enabled:pt.disabled}</dd>{row.webhook_url&&<><dt>{pt.metaWebhook}</dt><dd><code>{row.webhook_url}</code></dd></>}</dl>}
-    {whatsapp&&!row.channel_id&&row.webhook_url&&<p><strong>{pt.metaWebhook}:</strong> <code>{row.webhook_url}</code></p>}
-    <div className="integration-checklist"><h3>{pt.pendingSteps}</h3>
-      {row.pending_steps.length?<ol>{row.pending_steps.map(step=><li key={step}>{pt.integrationSteps[step as keyof typeof pt.integrationSteps]??step}</li>)}</ol>:<p className="muted">{pt.nothingPending}</p>}
-    </div>
-  </section>;
-}
-export function IntegrationPage({member}:{member:Membership}) {
-  const result=useRemote<Page<IntegrationState>>(member,'/integrations');
-  const queues=useRemote<Page<Queue>>(member,'/admin/queues');
-  return <><PageHeader title={pt.integrations} description={pt.integrationsDescription}/><p className="note"><Icon name="lock" size={16}/>{pt.integrationHint}</p>
-    {result.isPending?<Loading/>:result.isError?<Failure error={result.error}/>:result.data.items.map(row=><CredentialForm key={`${row.provider}:${row.version}`} member={member} row={row} queues={queues.data?.items??[]}/>)}
   </>;
 }
 

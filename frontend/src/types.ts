@@ -16,5 +16,6 @@ export type Queue = { id: string; name: string; kind: string; active: boolean; h
 export type RecordData = Record<string, unknown>;
 export type EntityReceipt = { id: string; version: number };
 export type AppointmentReceipt = { appointment_id: string; patient_id?: string; status: string; version: number };
-export type IntegrationState = { provider: 'whatsapp' | 'ai'; configured: boolean; version: number; updated_at: string | null; verification_status: string; setup_complete: boolean; metadata: Record<string,string>; channel_id: string | null; webhook_url: string | null; send_enabled: boolean; pending_steps: string[] };
+export type IntegrationState = { provider: 'whatsapp' | 'ai'; configured: boolean; version: number; updated_at: string | null; verification_status: string; setup_complete: boolean; metadata: Record<string,string>; channel_id: string | null; webhook_url: string | null; send_enabled: boolean; pending_steps: string[]; steps: {code: string; done: boolean}[]; health: IntegrationHealth | null };
+export type IntegrationHealth = { worker_online: boolean; worker_seen_at: string | null; last_event_at: string | null; webhook_verified_at: string | null; failed_deliveries: number; credentials_rejected: boolean };
 export type SupportRequest = { id: string; appointment_id: string; tenant_id?: string; status: string; version: number; reason?: string; duration_minutes?: number; expires_at: string | null };
