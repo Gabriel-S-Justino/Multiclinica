@@ -7,6 +7,9 @@ import type { IntegrationState, Membership, Page, Queue } from './types';
 
 /** Cada "interpretação" da IA reserva até 4.096 tokens; o dono pensa em quantidade, não em tokens. */
 const TOKENS_PER_INTERPRETATION = 4096;
+const providerNames: Record<string, string> = {
+  openai: 'OpenAI', anthropic: 'Anthropic (Claude)', gemini: 'Google (Gemini)', openrouter: 'OpenRouter',
+};
 
 function CopyValue({label, value}: {label: string; value: string}) {
   const [copied, setCopied] = useState(false);
@@ -85,7 +88,11 @@ function WhatsAppSetup({member, row, queues}: {member: Membership; row: Integrat
         current={current === 'fill_credentials' || current === 'verify_credentials' || current === 'channel_mismatch'}
         open={editing || current === 'fill_credentials' || current === 'verify_credentials' || current === 'channel_mismatch'}>
         {locked ? <p className="note">{pt.pauseToEdit}</p> : <form className="form-grid" onSubmit={saveAndVerify}>
-          <p className="wide muted">{pt.metaWhereToFind}</p>
+          <div className="wide"><ol>
+            <li>Abra o <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">painel de aplicativos da Meta</a> em outra aba e selecione o app da clínica.</li>
+            <li>Em WhatsApp → Configuração da API, selecione o telefone que atenderá os pacientes. Copie os dois identificadores para os campos abaixo.</li>
+            <li>Preencha o token de acesso e a chave secreta do mesmo app. Escolha a fila que receberá os pedidos de atendimento humano e clique em <strong>{pt.saveAndVerify}</strong>.</li>
+          </ol></div>
           <Label text={pt.phoneNumberId} hint={pt.phoneNumberIdHint}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.phone_number_id} onChange={event => set('phone_number_id', event.target.value)}/></Label>
           <Label text={pt.accountId} hint={pt.accountIdHint}><input inputMode="numeric" pattern="[0-9]{1,80}" required maxLength={80} value={values.account_id} onChange={event => set('account_id', event.target.value)}/></Label>
           <Label text={pt.accessToken} hint={pt.accessTokenHint}><input type="password" autoComplete="new-password" minLength={12} maxLength={4096} required={!row.configured} placeholder={row.configured ? pt.keepCredential : ''} value={values.access_token} onChange={event => set('access_token', event.target.value)}/></Label>
@@ -107,12 +114,14 @@ function WhatsAppSetup({member, row, queues}: {member: Membership; row: Integrat
         <p className="muted">{pt.linkHint}</p>
         <div className="form-actions"><button disabled={action.busy || !done.verify_credentials} onClick={provision}>{pt.provisionChannel}</button></div>
       </Step>
-      <Step index={3} title={pt.stepWebhook} done={Boolean(done.verify_meta)} current={current === 'verify_meta'}>
+      <Step index={3} title={pt.stepWebhook} done={Boolean(done.verify_meta)} current={current === 'verify_meta'} open={linked}>
         {row.webhook_url && meta.verify_token ? <>
-          <p className="muted">{pt.webhookHint}</p>
+          <p>Na aba da Meta, abra a configuração de Webhooks do WhatsApp Business e selecione a opção de editar o endereço de retorno.</p>
           <CopyValue label={pt.webhookUrl} value={row.webhook_url}/>
           <CopyValue label={pt.verifyToken} value={meta.verify_token}/>
-          <p className="field-hint">{pt.webhookWaiting}</p>
+          <ol><li>Cole a URL e o token acima nos campos correspondentes na Meta e clique em <strong>Verificar e salvar</strong>.</li>
+            <li>Nos campos do webhook da conta WhatsApp Business, assine <code>messages</code> para receber mensagens dos pacientes.</li>
+            <li>Volte a esta aba. O portal atualiza o status automaticamente.</li></ol>
         </> : <p className="muted">{pt.webhookAfterLink}</p>}
       </Step>
       <Step index={4} title={pt.stepDelivery} done={Boolean(done.enable_delivery)} current={current === 'enable_delivery'}>
@@ -120,6 +129,7 @@ function WhatsAppSetup({member, row, queues}: {member: Membership; row: Integrat
         <div className="form-actions"><button disabled={action.busy || !done.verify_meta} onClick={() => delivery(true)}>{pt.enableDelivery}</button></div>
       </Step>
     </ol>
+    {row.send_enabled && <p className="note">Para testar, envie “Olá” de outro celular ao número da clínica. Confira se o menu chega como resposta. Se nada chegar, confira a assinatura de <code>messages</code> na Meta e o estado do atendimento automático acima.</p>}
     <div className="form-actions">
       {done.verify_credentials && !editing && <button className="ghost" disabled={action.busy} onClick={() => setEditing(true)}>{pt.editConnection}</button>}
       {row.send_enabled && <button className="secondary" disabled={action.busy} onClick={() => delivery(false)}><Icon name="lock" size={16}/>{pt.pauseDelivery}</button>}
@@ -133,6 +143,7 @@ function AISetup({member, row}: {member: Membership; row: IntegrationState}) {
   const perMonth = Number(meta.monthly_tokens ?? 0) / TOKENS_PER_INTERPRETATION;
   const perPatient = Number(meta.conversation_tokens ?? 0) / TOKENS_PER_INTERPRETATION;
   const [apiKey, setApiKey] = useState('');
+  const [provider, setProvider] = useState(meta.provider ?? 'openai');
   const [model, setModel] = useState(meta.model ?? '');
   const [monthly, setMonthly] = useState(String(perMonth >= 1 ? Math.floor(perMonth) : 500));
   const [patient, setPatient] = useState(String(perPatient >= 1 ? Math.floor(perPatient) : 5));
@@ -149,17 +160,18 @@ function AISetup({member, row}: {member: Membership; row: IntegrationState}) {
     if (invalidLimits) return;
     const today = new Date().toLocaleDateString('pt-BR');
     const credentials: Record<string, string> = {
-      provider: 'openai', model: model.trim(), enabled: String(enabled && accepted),
+      provider, model: model.trim(), enabled: String(enabled && accepted),
       monthly_tokens: String(Number(monthly) * TOKENS_PER_INTERPRETATION),
       conversation_tokens: String(Number(patient) * TOKENS_PER_INTERPRETATION),
     };
     if (apiKey.trim()) credentials.api_key = apiKey.trim();
     if (accepted) {
       credentials.data_policy_reference = policyRef.trim() || `${pt.policyAcceptedOn} ${today}`;
-      credentials.contract_reference = contractRef.trim() || pt.openaiTerms;
+      credentials.contract_reference = contractRef.trim() || pt.providerTerms + provider;
     }
     void action.run(async () => {
       await action.send('/integrations/ai', {version: row.version, credentials}, 'PUT');
+      setApiKey('');
       await api('/integrations/ai/verify', {});
     }, pt.aiSaved);
   }
@@ -173,8 +185,12 @@ function AISetup({member, row}: {member: Membership; row: IntegrationState}) {
     <Feedback action={action}/>
     {!open ? <button className="secondary" onClick={() => {setOpen(true); setOpenedByUser(true);}}><Icon name="plus" size={16}/>{pt.configureAi}</button> :
       <form className="form-grid" onSubmit={save}>
-        <Label text={pt.apiKey} hint={pt.apiKeyHint}><input autoFocus={openedByUser} type="password" autoComplete="new-password" minLength={12} maxLength={4096} required={!row.configured} placeholder={row.configured ? pt.keepCredential : 'sk-...'} value={apiKey} onChange={event => setApiKey(event.target.value)}/></Label>
-        <Label text={pt.aiModel} hint={pt.aiModelHint}><input required maxLength={120} pattern="[A-Za-z0-9._-]{1,120}" placeholder={pt.aiModelPlaceholder} value={model} onChange={event => setModel(event.target.value)}/></Label>
+        <Label text={pt.aiProvider}><select value={provider} onChange={event => {
+          setProvider(event.target.value); setModel(''); setApiKey(''); setAccepted(false);
+          setEnabled(false); setContractRef(''); setPolicyRef('');
+        }}>{row.ai_providers.map(name => <option key={name} value={name}>{providerNames[name] ?? name}</option>)}</select></Label>
+        <Label text={pt.apiKey} hint={pt.apiKeyHint}><input autoFocus={openedByUser} type="password" autoComplete="new-password" maxLength={4096} required={!row.configured || meta.provider !== provider} placeholder={meta.provider === provider ? pt.keepCredential : ''} value={apiKey} onChange={event => setApiKey(event.target.value)}/></Label>
+        <Label text={pt.aiModel} hint={pt.aiModelHint}><input required maxLength={120} placeholder={pt.aiModelPlaceholder} value={model} onChange={event => setModel(event.target.value)}/></Label>
         <Label text={pt.monthlyInterpretations} hint={pt.monthlyInterpretationsHint}><input type="number" inputMode="numeric" min={1} max={200000} required value={monthly} onChange={event => setMonthly(event.target.value)}/></Label>
         <Label text={pt.patientInterpretations} hint={pt.patientInterpretationsHint}><input type="number" inputMode="numeric" min={1} max={1000} required value={patient} onChange={event => setPatient(event.target.value)}/></Label>
         {invalidLimits && <p className="feedback error wide" role="alert">{pt.aiLimitsInvalid}</p>}

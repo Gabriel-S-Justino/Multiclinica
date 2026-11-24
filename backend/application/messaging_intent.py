@@ -13,9 +13,9 @@ from backend.application.ai_boundary import (
     interpret_safely,
 )
 from backend.config import Settings
+from backend.infrastructure.chat_intent import ChatIntent
 from backend.infrastructure.db import transaction
 from backend.infrastructure.fields import unseal
-from backend.infrastructure.openai_intent import OpenAIIntent
 from backend.infrastructure.portal_models import IntegrationConfig
 
 ALLOWED_INTENTS = frozenset(Intent)
@@ -53,25 +53,30 @@ def menu_intent(
                 row.credentials_ciphertext,
             )
         )
-        if values.get("enabled") != "true" or values.get("provider") != "openai":
+        if values.get("enabled") != "true":
             return Intent.UNKNOWN
         model = values["model"]
         config = AIConfig(
             enabled=True,
-            provider="openai",
+            provider=values["provider"],
             model=model,
             data_policy_reference=values["data_policy_reference"],
             contract_reference=values["contract_reference"],
         )
         config.validate()
-        provider = OpenAIIntent(model, values["api_key"])
+        provider = ChatIntent(
+            model,
+            values["api_key"],
+            settings.ai_endpoints[values["provider"]],
+            openai=values["provider"] == "openai",
+        )
         with transaction(engine) as usage:
             reservation = ai_quota.reserve(
                 usage,
                 tenant_id,
                 event_key,
                 str(session_id),
-                provider="openai",
+                provider=values["provider"],
                 model=model,
                 tokens=RESERVED_TOKENS,
                 monthly_limit=int(values["monthly_tokens"]),

@@ -103,6 +103,7 @@ class IntegrationHealth(View):
 
 
 class IntegrationView(View):
+    ai_providers: list[str]
     provider: str
     configured: bool
     version: int

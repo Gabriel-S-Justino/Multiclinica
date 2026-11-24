@@ -11,12 +11,14 @@ from uuid import UUID, uuid4
 import httpx
 from sqlalchemy import func, select, text
 
+from backend.application.ai_boundary import Intent, IntentResult, SafeTurn
 from backend.application.portal_access import PortalContext, PortalError
 from backend.application.portal_commands import (
     ChannelProvisionDraft,
     DeliveryDraft,
     IntegrationDraft,
 )
+from backend.infrastructure.chat_intent import ChatIntent
 from backend.infrastructure.fields import seal, unseal
 from backend.infrastructure.messaging_models import (
     Dispatch,
@@ -187,6 +189,9 @@ class Integrations:
                     "verification_status": "verified" if verified else "not_verified",
                     "setup_complete": complete,
                     "metadata": metadata,
+                    "ai_providers": list(self.ctx.settings.ai_endpoints)
+                    if provider == "ai"
+                    else [],
                     "channel_id": str(channel.id) if provider == "whatsapp" and channel else None,
                     "webhook_url": (
                         f"{self.ctx.settings.public_origin}/v1/webhooks/whatsapp/{channel.id}"
@@ -233,9 +238,9 @@ class Integrations:
             ):
                 raise PortalError("channel_mismatch", 409)
         else:
-            if "provider" in values and values["provider"] != "openai":
+            if "provider" in values and values["provider"] not in self.ctx.settings.ai_endpoints:
                 raise PortalError("invalid_integration_fields", 422)
-            if "model" in values and not re.fullmatch(r"[A-Za-z0-9._-]{1,120}", values["model"]):
+            if "model" in values and len(values["model"]) > 120:
                 raise PortalError("invalid_integration_fields", 422)
             if values.get("enabled", "false") not in {"true", "false"}:
                 raise PortalError("invalid_integration_fields", 422)
@@ -262,7 +267,7 @@ class Integrations:
             raw = value.get_secret_value()
             if not raw.strip() or len(raw) > 4096 or not raw.isprintable():
                 raise PortalError("invalid_integration_fields", 422)
-            if key in SECRET_FIELDS and (len(raw) < 12 or not raw.isascii()):
+            if key in SECRET_FIELDS and ((key != "api_key" and len(raw) < 12) or not raw.isascii()):
                 raise PortalError("invalid_integration_fields", 422)
         replay = self.ctx.replay("integration.save", command, provider)
         if replay is not None:
@@ -279,6 +284,19 @@ class Integrations:
             raise PortalError("version_conflict", 409)
         previous = self._values(row, provider)
         provided = {key: value.get_secret_value() for key, value in command.credentials.items()}
+        if (
+            provider == "ai"
+            and previous
+            and "provider" in provided
+            and provided["provider"] != previous.get("provider")
+        ):
+            if "api_key" not in provided:
+                raise PortalError("integration_incomplete", 409)
+            previous = {
+                key: value
+                for key, value in previous.items()
+                if key not in {"enabled", "data_policy_reference", "contract_reference", "model"}
+            }
         values = {**previous, **provided}
         if provider == "whatsapp":
             # O dono não precisa escolher a versão da API nem inventar o token do webhook.
@@ -422,11 +440,20 @@ class Integrations:
             if values["phone_number_id"] not in listed:
                 raise PortalError("phone_not_in_account", 409)
         else:
-            self._get(
-                f"https://api.openai.com/v1/models/{values['model']}",
-                {"Authorization": f"Bearer {values['api_key']}"},
-                None,
+            adapter = ChatIntent(
+                values["model"],
+                values["api_key"],
+                self.ctx.settings.ai_endpoints[values["provider"]],
+                openai=values["provider"] == "openai",
             )
+            try:
+                sample = SafeTurn("Voltar ao menu", "MENU", frozenset(Intent))
+                raw = adapter.interpret(sample, timeout_seconds=5, max_output_tokens=128)
+                IntentResult.model_validate_json(raw)
+            except httpx.RequestError:
+                raise PortalError("provider_unavailable", 503) from None
+            except (httpx.HTTPStatusError, KeyError, IndexError, TypeError, ValueError):
+                raise PortalError("provider_verification_failed", 409) from None
         row.verified_version, row.verified_at = row.version, moment
         self.ctx.audit(f"integration.{provider}_verified", row.id)
         return {"provider": provider, "status": "credentials_verified"}

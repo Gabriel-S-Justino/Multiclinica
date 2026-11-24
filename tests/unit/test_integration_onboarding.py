@@ -5,11 +5,14 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
+import pytest
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from sqlalchemy import Select
 
 from backend.application.integrations import Integrations
+from backend.application.portal_access import PortalError
 from backend.application.portal_commands import IntegrationDraft
 from backend.config import Settings
 from backend.infrastructure.fields import unseal
@@ -165,3 +168,47 @@ def test_metadata_update_preserves_existing_secrets():
         "enable_ai_adapter",
     ]
     assert "synthetic-api-token-000000" not in str(exposed)
+
+
+def test_custom_provider_verifies_model_and_requires_own_key_on_switch(monkeypatch):
+    ctx = new_context()
+    ctx.validate = ctx.admin
+    ctx.settings.ai_extra_endpoints = {"clinica": "https://gateway.example/v1/"}
+    service = Integrations(ctx)
+
+    def save(version, **credentials):
+        return service.save(
+            "ai",
+            IntegrationDraft(
+                version=version, idempotency_key=str(uuid4()), credentials=credentials
+            ),
+        )
+
+    save(0, provider="openai", model="prior", api_key=secrets.token_hex(16))
+    with pytest.raises(PortalError):
+        save(1, provider="clinica", model="empresa/modelo:teste")
+    new_key = secrets.token_hex(16)
+    save(1, provider="clinica", model="empresa/modelo:teste", api_key=new_key)
+    item = next(item for item in service.list()["items"] if item["provider"] == "ai")
+    assert "clinica" in item["ai_providers"]
+    assert new_key not in str(item)
+    content = '{"intent":"menu","confidence":1,"needs_clarification":false}'
+
+    def respond(self, url, *, headers, json):
+        assert url == "https://gateway.example/v1/chat/completions"
+        assert headers["Authorization"] == "Bearer " + new_key
+        assert json["model"] in {"empresa/modelo:teste", "incompatible"}
+        assert json["messages"][-1]["content"] == "Voltar ao menu"
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={"choices": [{"message": {"content": content}}], "usage": {"total_tokens": 42}},
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", respond)
+    assert service.verify("ai")["status"] == "credentials_verified"
+    save(2, model="incompatible")
+    content = "invalid"
+    with pytest.raises(PortalError):
+        service.verify("ai")
+    assert ctx.db.rows[0].verified_version != ctx.db.rows[0].version

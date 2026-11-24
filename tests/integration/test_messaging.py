@@ -250,16 +250,20 @@ def test_webhook_auth_before_parse_routing_and_persistent_dedup(messaging):
     )
 
 
-def test_configured_ai_routes_only_menu_and_preserves_fallback(messaging, monkeypatch):
+@pytest.mark.parametrize("provider", ["openai", "gemini"])
+def test_configured_ai_routes_only_menu_and_preserves_fallback(messaging, monkeypatch, provider):
     p = messaging
     calls = []
     original_post = httpx.Client.post
 
     def fake_post(self, url, **kwargs):
-        if url != "https://api.openai.com/v1/chat/completions":
+        if url != p.h.settings.ai_endpoints[provider] + "/chat/completions":
             return original_post(self, url, **kwargs)
         calls.append(kwargs["json"])
-        assert kwargs["json"]["store"] is False
+        if provider == "openai":
+            assert kwargs["json"]["store"] is False
+        else:
+            assert kwargs["json"]["max_tokens"] == 128
         return httpx.Response(
             200,
             request=httpx.Request("POST", url),
@@ -295,7 +299,7 @@ def test_configured_ai_routes_only_menu_and_preserves_fallback(messaging, monkey
                     json.dumps(
                         {
                             "enabled": "true",
-                            "provider": "openai",
+                            "provider": provider,
                             "model": "synthetic",
                             "api_key": uuid4().hex,
                             "data_policy_reference": "TEST",
@@ -317,7 +321,7 @@ def test_configured_ai_routes_only_menu_and_preserves_fallback(messaging, monkey
     assert len(calls) == 1
     with Session(p.h.admin) as db:
         usage = db.scalar(select(AIUsage))
-        assert (usage.status, usage.used_tokens) == ("complete", 120)
+        assert (usage.provider, usage.status, usage.used_tokens) == (provider, "complete", 120)
         assert not db.scalar(select(func.count()).select_from(Appointment))
 
 

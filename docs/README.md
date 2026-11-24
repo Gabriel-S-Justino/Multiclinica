@@ -15,8 +15,9 @@ O portal atual está em [Multiclinica](https://multclinicai.vercel.app). Comece 
 | [Permissões](users-and-permissions.md) | Cargos e permissões por vínculo |
 | [API](api.md) | Contratos e referência OpenAPI |
 | [Segurança](security.md) | STRIDE e controles |
-| [IA](ai-provider-setup.md) | Interfaces e guardrails |
-| [WhatsApp](whatsapp-provider-setup.md) | Fronteira de integração |
+| [Configuração de IA](ai-provider-setup.md) | Escolha do provedor e do modelo, verificação da chave, limites de uso e cadastro de outros provedores |
+| [Vínculo do WhatsApp](whatsapp-provider-setup.md) | Localização dos IDs na Meta, configuração do webhook e teste da primeira resposta |
+| [Relatório das integrações](reports/integracoes-antes-e-depois.md) | Comparação antes e depois e resultados dos testes |
 | [LGPD](lgpd.md) | Pendências e ciclo de dados |
 | [Deploy](deployment-vercel-neon.md) | Restrições e fontes verificadas |
 | [Testes](testing.md) | Critérios e rastreabilidade |

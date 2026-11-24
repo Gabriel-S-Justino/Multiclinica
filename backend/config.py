@@ -1,9 +1,17 @@
+import re
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BUILTIN_AI_ENDPOINTS = {
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "openrouter": "https://openrouter.ai/api/v1",
+}
 
 
 class Settings(BaseSettings):
@@ -14,6 +22,29 @@ class Settings(BaseSettings):
     token_key: SecretStr
     field_key: SecretStr
     mfa_required: bool = True
+
+    ai_extra_endpoints: dict[str, str] = {}
+
+    @field_validator("ai_extra_endpoints")
+    @classmethod
+    def trusted_ai_endpoints(cls, endpoints: dict[str, str]) -> dict[str, str]:
+        for name, url in endpoints.items():
+            parsed = urlsplit(url)
+            if (
+                not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", name)
+                or name in BUILTIN_AI_ENDPOINTS
+                or parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError("Provedor ou endereço HTTPS de IA inválido")
+        return endpoints
+
+    @property
+    def ai_endpoints(self) -> dict[str, str]:
+        return BUILTIN_AI_ENDPOINTS | self.ai_extra_endpoints
 
     @field_validator("database_url")
     @classmethod

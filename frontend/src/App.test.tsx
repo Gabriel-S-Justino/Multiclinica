@@ -134,3 +134,45 @@ test('pede confirmação antes de descartar alterações de um formulário', asy
   fireEvent.click(await screen.findByRole('button', {name:'Descartar'}));
   expect(screen.queryByLabelText('Nome fantasia')).not.toBeInTheDocument();
 });
+
+test('trocar o provedor exige chave, modelo e aceite para o novo destino', async () => {
+  const ai = {
+    provider: 'ai', ai_providers: ['openai', 'provedor-local'], configured: true, version: 3,
+    metadata: {provider: 'openai', model: 'anterior', enabled: 'true', data_policy_reference: 'politica', contract_reference: 'contrato'},
+    steps: [],
+  };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.endsWith('/auth/session')) return Response.json({
+      user_id: 'u', active_membership_id: 'm',
+      memberships: [{id: 'm', tenant_id: 't', role: 'admin', capabilities: ['integrations.manage']}],
+    });
+    return Response.json({items: url.endsWith('/integrations') ? [ai] : []});
+  }));
+  mount('/integrations');
+  fireEvent.change(await screen.findByRole('combobox', {name: /Provedor da IA/}), {target: {value: 'provedor-local'}});
+  expect(screen.getByRole('textbox', {name: /Identificador do modelo/})).toHaveValue('');
+  expect(screen.getByLabelText(/Cole a chave emitida/)).toBeRequired();
+  expect(screen.getByRole('checkbox', {name: /A clínica aprovou/})).not.toBeChecked();
+  expect(screen.getByRole('checkbox', {name: /Usar a IA/})).toBeDisabled();
+});
+
+test('mantém os dados da Meta acessíveis depois da confirmação do webhook', async () => {
+  const channel = {
+    provider: 'whatsapp', configured: true, version: 1, channel_id: 'canal', send_enabled: false,
+    metadata: {verify_token: 'valor-de-exemplo'}, webhook_url: 'https://clinica.example/canal',
+    steps: ['fill_credentials', 'verify_credentials', 'provision_channel', 'verify_meta', 'enable_delivery']
+      .map(code => ({code, done: code !== 'enable_delivery'})),
+  };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.endsWith('/auth/session')) return Response.json({
+      user_id: 'u', active_membership_id: 'm',
+      memberships: [{id: 'm', tenant_id: 't', role: 'admin', capabilities: ['integrations.manage']}],
+    });
+    return Response.json({items: url.endsWith('/integrations') ? [channel] : []});
+  }));
+  mount('/integrations');
+  expect(await screen.findByDisplayValue(channel.webhook_url)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(channel.metadata.verify_token)).toBeInTheDocument();
+  expect(screen.getByText('messages')).toBeVisible();
+  expect(screen.getByRole('button', {name: 'Ativar envio'})).toBeEnabled();
+});
