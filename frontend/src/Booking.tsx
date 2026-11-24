@@ -36,6 +36,7 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
   const [patientId, setPatient] = useState(original?.patient_id ?? '');
   const [patientName, setPatientName] = useState(original?.patient_name ?? '');
   const [birthDate, setBirthDate] = useState('');
+  const [noticeAuthorized, setNoticeAuthorized] = useState(false);
   const [purpose, setPurpose] = useState(false);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotCursor, setSlotCursor] = useState<string | null>();
@@ -77,7 +78,7 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
     const result = await action.run(async () => {
       if (!hold) throw new Error();
       return original
-        ? action.send<AppointmentReceipt>(`/appointments/${original.id}/reschedule`, {appointment_id:original.id,contact_id:contactId,version:original.version,hold_id:hold.hold_id})
+        ? action.send<AppointmentReceipt>(`/appointments/${original.id}/reschedule`, {appointment_id:original.id,contact_id:contactId,version:original.version,hold_id:hold.hold_id,whatsapp_notice_authorized:noticeAuthorized})
         : action.send<AppointmentReceipt>('/appointments', {hold_id:hold.hold_id,contact_id:contactId,
           ...(patientId ? {patient_id:patientId} : {new_patient:{display_name:patientName,purpose_acknowledged:purpose,...(service?.requires_birth_date ? {birth_date:birthDate} : {})}})});
     });
@@ -104,7 +105,7 @@ export function Booking({member, original, onClose, onDone}: {member: Membership
         <dt>{pt.date}</dt><dd>{formatLongDay(summary.local_date)} · {summary.local_start}</dd><dt>{pt.unit}</dt><dd>{summary.unit_name}</dd>
         <dt>{pt.durationShort}</dt><dd>{summary.duration_minutes} {pt.minutesShort}</dd>
         <dt>{pt.timezone}</dt><dd>{timezoneLabel(summary.timezone)}</dd>
-      </dl><HoldTimer seconds={secondsLeft} until={summary.expires_at} timezone={summary.timezone}/>
+      </dl>{original && <label className="check"><input type="checkbox" checked={noticeAuthorized} onChange={event=>setNoticeAuthorized(event.target.checked)}/>O paciente ou responsável autorizou receber este aviso por WhatsApp, mesmo sem conversa recente com a clínica.</label>}<HoldTimer seconds={secondsLeft} until={summary.expires_at} timezone={summary.timezone}/>
       <div className="form-actions"><button className="secondary" disabled={action.busy} onClick={() => {
           // Uma reserva expirada já foi liberada pelo servidor; basta voltar à escolha de horário.
           if (secondsLeft) void release(); else { setHold(undefined); setSummary(undefined); setSlots([]); setSearched(false); }
@@ -157,6 +158,7 @@ export function AppointmentDetails({member, appointmentId, onClose, onReschedule
     <Feedback action={action}/>{result.isPending ? <Loading/> : result.isError ? <Failure error={result.error}/> : row && <>
       <div className="appointment-title"><div><h3>{row.patient_name}</h3><p>{row.service_name}</p></div><Status value={row.status}/></div>
       <dl className="review-grid"><dt>{pt.professional}</dt><dd>{row.professional_name}</dd><dt>{pt.date}</dt><dd>{formatLongDay(row.local_date)}</dd><dt>{pt.time}</dt><dd>{row.local_start} a {row.local_end}</dd><dt>{pt.unit}</dt><dd>{row.unit_name}</dd></dl>
+      {row.reschedule_notice_status && <p className="note" role="status">Aviso de remarcação por WhatsApp · {pt.statuses[row.reschedule_notice_status] ?? row.reschedule_notice_status}. {['failed','blocked','unknown','dead'].includes(row.reschedule_notice_status) && 'Confira o contato e combine o novo horário por outro canal autorizado.'}</p>}
       {mode==='cancel' ? <div className="confirm-box"><h3>{pt.confirmCancelTitle}</h3><p>{pt.cancellationHint}</p><div className="form-actions"><button type="button" className="secondary" disabled={action.busy} onClick={()=>setMode('details')}>{pt.keepAppointment}</button><button className="danger" disabled={action.busy} onClick={()=>void action.run(async()=>{await action.send(`/appointments/${row.id}/cancel`,{appointment_id:row.id,contact_id:row.contact_id,version:row.version});setMode('details');},pt.canceled)}>{pt.cancelConfirm}</button></div></div> : mode==='verify' ? <form className="form-grid" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
         await action.send('/patient-verifications',{patient_id:row.patient_id,contact_id:row.contact_id,relationship,identity_checked:identity,authority_checked:authority,evidence_reference:evidence});setMode('details');
       },pt.verified);}}><p className="wide muted">{pt.identityHint}</p><Label text={pt.relationship}><select value={relationship} onChange={event=>setRelationship(event.target.value)}><option value="self">{pt.self}</option><option value="dependent">{pt.dependent}</option><option value="authorized_other">{pt.authorizedOther}</option></select></Label>

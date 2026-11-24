@@ -86,10 +86,14 @@ class Message(ClinicRecord):
     __table_args__ = (
         UniqueConstraint("tenant_id", "id"),
         tenant_fk("conversations", "conversation_id"),
+        tenant_fk("appointments", "rescheduled_appointment_id"),
+        UniqueConstraint("tenant_id", "rescheduled_appointment_id"),
         CheckConstraint("direction IN ('inbound','outbound')"),
         Index("messages_conversation_page", "tenant_id", "conversation_id", "created_at", "id"),
     )
     conversation_id: Mapped[UUID] = mapped_column()
+    rescheduled_appointment_id: Mapped[UUID | None] = mapped_column()
+    template_ciphertext: Mapped[str | None] = mapped_column(Text)
     body_ciphertext: Mapped[str] = mapped_column(Text)
     direction: Mapped[str] = mapped_column(String(20))
     delivery_status: Mapped[str] = mapped_column(String(20))

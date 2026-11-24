@@ -13,7 +13,7 @@ from backend.application.scheduling_commands import AvailabilityQuery
 from backend.domain.scheduling import ACTIVE_STATUSES
 from backend.infrastructure.fields import unseal
 from backend.infrastructure.models import AuditLog, Professional, Tenant, Unit
-from backend.infrastructure.portal_models import AdminNotification
+from backend.infrastructure.portal_models import AdminNotification, Message
 from backend.infrastructure.scheduling_models import (
     Appointment,
     AppointmentHold,
@@ -133,6 +133,13 @@ class PortalRead:
             "local_start": row.starts_at.astimezone(zone).strftime("%H:%M"),
             "local_end": row.ends_at.astimezone(zone).strftime("%H:%M"),
             "identity_verified": verified,
+            "reschedule_notice_status": self.db.scalar(
+                select(Message.delivery_status).where(
+                    Message.tenant_id == row.tenant_id, Message.rescheduled_appointment_id == row.id
+                )
+            )
+            if row.reschedule_count and not exceptional
+            else None,
             "actions": actions,
         }
 

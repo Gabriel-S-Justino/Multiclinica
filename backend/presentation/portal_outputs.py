@@ -11,6 +11,7 @@ class Page[T](View):
 
 
 class AppointmentView(View):
+    reschedule_notice_status: str | None = None
     id: str
     status: str
     version: int

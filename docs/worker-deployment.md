@@ -57,3 +57,7 @@ O comando lista, por canal, as mensagens recebidas e enviadas por estado e se o 
 Ao publicar uma versão nova, a hospedagem envia SIGTERM. O processador termina o ciclo em andamento e encerra sem interromper uma transação no meio. Mensagens que chegarem nesse intervalo ficam guardadas e são tratadas assim que a nova versão subir.
 
 Aplique as migrações do banco antes de atualizar o processador, como já é feito para o portal.
+
+## Publicar os avisos de remarcação
+
+Aplique a migração Alembic 0014 antes de atualizar a API e o worker para a versão com avisos. No processo de atualização, evite que um worker da versão anterior processe mensagens da nova versão. Confirme a aprovação do modelo na conta WhatsApp Business da clínica e faça um teste acompanhado. [Modelo e procedimento de homologação](whatsapp-provider-setup.md#avisos-de-remarcação-fora-da-janela-de-atendimento)

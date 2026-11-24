@@ -83,3 +83,9 @@ Evidências finais e limitações: [relatório F3](reports/f3-scheduling.md). Te
 - [cryptography: AEAD](https://cryptography.io/en/latest/hazmat/primitives/aead/): uso de nonce e associated data da biblioteca, sem criação de algoritmo próprio.
 
 As páginas atuais são mutáveis; o runtime efetivamente testado foi Python 3.12.14/PostgreSQL 18.6 e versões fixadas no lock. Compatibilidade com pool remoto e planos de hospedagem continua sem teste real.
+
+## Aviso ao contato verificado
+
+Ao confirmar uma remarcação pelo portal, a troca de consulta e o registro do aviso de WhatsApp pertencem à mesma transação. Uma repetição da mesma operação reutiliza o resultado. O texto contém o nome do profissional do novo horário e a data e hora no fuso da clínica. Uma remarcação iniciada pelo paciente no WhatsApp continua recebendo a confirmação no próprio fluxo.
+
+O processamento ocorre após o commit. O executor verifica novamente o contato, o vínculo com o paciente, a preferência de mensagens e a validade do novo agendamento antes da tentativa de envio. A entrega é acompanhada nos detalhes da nova consulta. [Configuração do canal e do modelo](whatsapp-provider-setup.md)

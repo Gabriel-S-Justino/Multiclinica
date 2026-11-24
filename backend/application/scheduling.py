@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.application.portal import read_professional, visible_professionals
+from backend.application.reschedule_notice import queue_reschedule_notice
 from backend.application.scheduling_commands import (
     AppointmentMutation,
     AvailabilityQuery,
@@ -406,7 +407,13 @@ class Scheduler:
         return SlotPage(tuple(slots[query.offset : end]), end if end < len(slots) else None)
 
     def _request_hash(self, command: BaseModel) -> str:
-        return digest(self.settings, "booking-request", command.model_dump_json())
+        # Preserve request fingerprints stored before optional template authorization existed.
+        exclude = (
+            {"whatsapp_notice_authorized"}
+            if isinstance(command, RescheduleRequest) and not command.whatsapp_notice_authorized
+            else set()
+        )
+        return digest(self.settings, "booking-request", command.model_dump_json(exclude=exclude))
 
     def _replay(self, operation: str, command: Mutation) -> dict[str, Any] | None:
         if (
@@ -1022,6 +1029,15 @@ class Scheduler:
         self._finish_conversation(hold, command.conversation_version, new_id)
         self._record(old, old_status, now, command.idempotency_key)
         self._record(replacement, None, now, command.idempotency_key)
+        if not isinstance(self.identity, ContactPrincipal):
+            queue_reschedule_notice(
+                self.db,
+                self.settings,
+                replacement,
+                self.identity.user_id,
+                now,
+                command.whatsapp_notice_authorized,
+            )
         return self._save(
             "reschedule",
             command,

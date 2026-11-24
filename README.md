@@ -6,6 +6,7 @@ Em **Integrações**, cada clínica vincula seu número de WhatsApp Business e p
 
 A equipe Multiclinica acompanha a implantação e a homologação. [Guia de implantação assistida](docs/integration-onboarding.md) · [Critérios de liberação](docs/release-runbook.md)
 
+- [Guias de uso para médicos, recepção e administradores](docs/README.md#guias-de-uso-por-perfil)
 - [Documentação técnica](docs/README.md)
 - [Execução local](docs/foundation.md)
 - [Portal e permissões](docs/users-and-permissions.md)

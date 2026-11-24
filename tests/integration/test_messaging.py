@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 from backend.application import ai_quota
 from backend.application.messaging_worker import process_one, send_one
 from backend.application.scheduling import Scheduler
-from backend.application.scheduling_commands import HoldRequest, ReleaseRequest
-from backend.domain.permissions import ContactPrincipal
+from backend.application.scheduling_commands import HoldRequest, ReleaseRequest, RescheduleRequest
+from backend.domain.permissions import ContactPrincipal, Principal
 from backend.domain.scheduling import SchedulingError
 from backend.infrastructure.fields import seal, unseal
 from backend.infrastructure.messaging_models import (
@@ -725,3 +725,84 @@ def test_worker_heartbeat_and_expired_credential_cleanup(messaging):
     }
     with Session(p.h.admin) as db:
         assert db.scalar(select(func.count()).select_from(WorkerHeartbeat)) == 1
+
+
+@pytest.mark.parametrize("mode", ["template", "text", "no_consent", "revoked", "superseded"])
+def test_staff_reschedule_notice(messaging, mode):
+    from zoneinfo import ZoneInfo
+
+    from backend.infrastructure.models import Professional
+    from backend.infrastructure.scheduling_models import ContactPatientLink
+
+    p, h = messaging, messaging.h
+    original = UUID(h.confirm(h.hold())["appointment_id"])
+    h.identity = Principal(
+        h.ids["collaborator"], h.ids["tenant"], h.ids["collaborator_member"], "collaborator", True
+    )
+    starts = h.start + timedelta(minutes=15)
+    hold = h.hold(starts_at=starts, reschedule_appointment_id=original, appointment_version=0)
+    if mode == "text":
+        p.step("menu")
+    command = RescheduleRequest(
+        idempotency_key=uuid4().hex,
+        appointment_id=original,
+        contact_id=h.ids["contact"],
+        version=0,
+        hold_id=UUID(hold["hold_id"]),
+        whatsapp_notice_authorized=mode in {"template", "revoked", "superseded"},
+    )
+    result = h.run("reschedule", command)
+    assert h.run("reschedule", command) == result
+    with Session(h.admin) as db, db.begin():
+        db.get(MessagingChannel, p.channel_id).send_enabled = True
+        if mode == "revoked":
+            db.scalar(select(ContactPatientLink)).revoked = True
+        name = db.get(Professional, h.ids["professional"]).display_name
+        msg = db.scalars(
+            select(Message).where(
+                Message.rescheduled_appointment_id == UUID(result["appointment_id"])
+            )
+        ).one()
+        body = unseal(h.settings, msg.tenant_id, "message", msg.id, "body", msg.body_ciphertext)
+        assert (
+            name in body
+            and starts.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%H:%M") in body
+        )
+        msg_id = msg.id
+
+    if mode == "superseded":
+        replacement = UUID(result["appointment_id"])
+        next_hold = h.hold(
+            starts_at=starts + timedelta(minutes=15),
+            reschedule_appointment_id=replacement,
+            appointment_version=0,
+        )
+        h.run(
+            "reschedule",
+            RescheduleRequest(
+                idempotency_key=uuid4().hex,
+                appointment_id=replacement,
+                contact_id=h.ids["contact"],
+                version=0,
+                hold_id=UUID(next_hold["hold_id"]),
+            ),
+        )
+
+    class Capture:
+        def send_text(self, destination, text):
+            assert mode == "text" and destination == "+15550000000"
+            return uuid4().hex
+
+        def send_reschedule(self, destination, parameters):
+            local = starts.astimezone(ZoneInfo("America/Sao_Paulo"))
+            assert mode == "template" and destination == "+15550000000"
+            assert parameters == [name, local.strftime("%d/%m/%Y"), local.strftime("%H:%M")]
+            return uuid4().hex
+
+    for _ in range(5):
+        if not send_one(h.runtime, h.settings, p.channel_id, Capture()):
+            break
+    with Session(h.admin) as db:
+        assert db.get(Message, msg_id).delivery_status == (
+            "sent" if mode in {"template", "text"} else "blocked"
+        )

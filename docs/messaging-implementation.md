@@ -25,6 +25,6 @@ Os comandos `enable` e `disable` continuam disponíveis para a equipe Multiclini
 
 ## Falhas e limites
 
-Monitore atraso, jobs com falha, entregas de estado desconhecido e parada do executor. Falhas de conexão antes de chegar à Meta são reenviadas automaticamente. Entregas de estado desconhecido não são reenviadas, para não duplicar mensagens; a tela de Integrações mostra a quantidade de falhas dos últimos 7 dias. Falhas transitórias elegíveis têm retentativas limitadas. Fora da janela de atendimento, o sistema bloqueia texto livre. O projeto ainda não oferece templates proativos.
+Monitore atraso, jobs com falha, entregas de estado desconhecido e parada do executor. Falhas de conexão antes de chegar à Meta são reenviadas automaticamente. Entregas de estado desconhecido não são reenviadas, para não duplicar mensagens; a tela de Integrações mostra a quantidade de falhas dos últimos 7 dias. Falhas transitórias elegíveis têm retentativas limitadas. Fora da janela de atendimento, o sistema bloqueia texto livre. O aviso de remarcação do portal pode usar o modelo de utilidade aprovado para o contato autorizado. Veja o [texto do modelo e as condições de envio](whatsapp-provider-setup.md#avisos-de-remarcação-fora-da-janela-de-atendimento).
 
 Cada clínica tem um canal. A troca de conta, número ou fila exige rotação acompanhada. O número é vinculado pelo portal, depois da verificação na Meta.

@@ -98,6 +98,7 @@ class AppointmentMutation(Mutation):
 
 
 class RescheduleRequest(AppointmentMutation):
+    whatsapp_notice_authorized: bool = False
     hold_id: UUID
     conversation_version: int | None = Field(default=None, ge=0)
 

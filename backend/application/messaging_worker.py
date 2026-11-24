@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.application.messaging_flow import Flow
 from backend.application.messaging_intent import menu_intent
+from backend.application.messaging_session import contact_session
 from backend.application.webhooks import channel_for, credentials
 from backend.config import Settings
 from backend.domain.scheduling import SchedulingError
@@ -24,8 +25,9 @@ from backend.infrastructure.messaging_models import (
 from backend.infrastructure.models import AuditLog
 from backend.infrastructure.portal_models import Message
 from backend.infrastructure.scheduling_models import (
+    Appointment,
     Contact,
-    Conversation,
+    ContactPatientLink,
     ConversationState,
     OutboxEvent,
 )
@@ -74,62 +76,7 @@ def session_for(
         db.flush()
     if not contact.active:
         raise SchedulingError("contact_unavailable")
-    session = db.scalar(
-        select(MessagingSession).where(
-            MessagingSession.tenant_id == channel.tenant_id,
-            MessagingSession.channel_id == channel.id,
-            MessagingSession.contact_id == contact.id,
-        )
-    )
-    if not session:
-        active = list(
-            db.execute(
-                select(Conversation, ConversationState)
-                .join(
-                    ConversationState,
-                    (Conversation.id == ConversationState.conversation_id)
-                    & (Conversation.tenant_id == ConversationState.tenant_id),
-                )
-                .where(
-                    Conversation.tenant_id == channel.tenant_id,
-                    Conversation.contact_id == contact.id,
-                    ConversationState.state != "DONE",
-                )
-                .with_for_update()
-            )
-        )
-        if len(active) > 1:
-            raise SchedulingError("conversation_conflict")
-        if active:
-            conversation, state = active[0]
-        else:
-            conversation = Conversation(
-                id=uuid4(), tenant_id=channel.tenant_id, contact_id=contact.id
-            )
-            db.add(conversation)
-            db.flush()
-            state = ConversationState(
-                tenant_id=channel.tenant_id,
-                conversation_id=conversation.id,
-                state="START",
-                version=0,
-                context={},
-            )
-            db.add(state)
-        row_id = uuid4()
-        session = MessagingSession(
-            id=row_id,
-            tenant_id=channel.tenant_id,
-            channel_id=channel.id,
-            contact_id=contact.id,
-            conversation_id=conversation.id,
-            context_ciphertext=seal(
-                settings, channel.tenant_id, "messaging_session", row_id, "context", "{}"
-            ),
-            last_inbound_at=moment,
-        )
-        db.add(session)
-        db.flush()
+    session = contact_session(db, settings, channel, contact, moment)
     state = db.scalar(
         select(ConversationState)
         .where(
@@ -260,7 +207,9 @@ def process_one(engine: Engine, settings: Settings, channel_id: UUID) -> bool:
                             created_at=provider_at,
                         )
                     )
-                    session.last_inbound_at = max(session.last_inbound_at, provider_at)
+                    session.last_inbound_at = max(
+                        session.last_inbound_at or provider_at, provider_at
+                    )
                     flow = Flow(db, settings, channel, session, state, moment, str(job.id))
                     if session.last_provider_at and provider_at < session.last_provider_at:
                         if state.state != "HUMAN_HANDOFF" and not session.opted_out:
@@ -401,11 +350,52 @@ def send_one(
             row.status, row.error_code = "dead", "message_unavailable"
             return True
         contact = db.get(Contact, session.contact_id)
+        in_window = bool(
+            session.last_inbound_at and moment < session.last_inbound_at + timedelta(hours=24)
+        )
+        template = None
+        if message.rescheduled_appointment_id:
+            appointment = db.get_one(Appointment, message.rescheduled_appointment_id)
+            verified = db.scalar(
+                select(ContactPatientLink.id).where(
+                    ContactPatientLink.tenant_id == channel.tenant_id,
+                    ContactPatientLink.contact_id == session.contact_id,
+                    ContactPatientLink.patient_id == appointment.patient_id,
+                    ContactPatientLink.revoked.is_(False),
+                    ContactPatientLink.verification_method == "manual_clinic",
+                    ContactPatientLink.verified_by.is_not(None),
+                    ContactPatientLink.verified_at <= moment,
+                    ContactPatientLink.verified_until > moment,
+                )
+            )
+            if (
+                not verified
+                or appointment.contact_id != session.contact_id
+                or appointment.status not in {"scheduled", "confirmed"}
+                or appointment.starts_at <= moment
+            ):
+                row.status, row.error_code, message.delivery_status = (
+                    "blocked",
+                    "notice_obsolete",
+                    "blocked",
+                )
+                return True
+            if not in_window and message.template_ciphertext:
+                template = json.loads(
+                    unseal(
+                        settings,
+                        channel.tenant_id,
+                        "message",
+                        message.id,
+                        "template",
+                        message.template_ciphertext,
+                    )
+                )
         if (
             not contact
             or not contact.active
             or session.opted_out
-            or moment >= session.last_inbound_at + timedelta(hours=24)
+            or (not in_window and template is None)
         ):
             row.status, row.error_code, message.delivery_status = (
                 "blocked",
@@ -438,7 +428,11 @@ def send_one(
         # Persist intent before I/O. Crash afterwards is unknown, never automatic resend.
     result, failure = None, None
     try:
-        result = provider.send_text(destination, content)
+        result = (
+            provider.send_text(destination, content)
+            if template is None
+            else provider.send_reschedule(destination, template)
+        )
     except ProviderFailure as error:
         failure = error
     except Exception:

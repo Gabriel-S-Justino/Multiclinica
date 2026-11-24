@@ -48,7 +48,7 @@ class MessagingSession(ClinicRecord):
     contact_id: Mapped[UUID] = mapped_column()
     conversation_id: Mapped[UUID] = mapped_column()
     context_ciphertext: Mapped[str] = mapped_column(Text)
-    last_inbound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_provider_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     opted_out: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -2,6 +2,15 @@
 
 O portal atual está em [Multiclinica](https://multclinicai.vercel.app). Comece pelo [roteiro de implantação](integration-onboarding.md) e pelos [critérios de produção](release-runbook.md). Relatórios e decisões das fases iniciais são registros históricos.
 
+## Guias de uso por perfil
+
+- [Médicos](guia-medico.md)
+- [Recepção](guia-recepcao.md)
+- [Administradores da clínica](guia-admin-clinica.md)
+- [Administradores da plataforma](guia-admin-plataforma.md)
+
+## Referência técnica
+
 | Documento | Conteúdo |
 |---|---|
 | [Especificação original](master.md) | Master.md fornecido pelo usuário, preservado como fonte |

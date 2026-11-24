@@ -19,6 +19,8 @@ class ProviderFailure(Exception):
 class WhatsAppProvider(Protocol):
     def send_text(self, destination: str, text: str) -> str: ...
 
+    def send_reschedule(self, destination: str, parameters: list[str]) -> str: ...
+
 
 def verify_signature(raw: bytes, signature: str, app_secret: str) -> bool:
     expected = "sha256=" + hmac.new(app_secret.encode(), raw, hashlib.sha256).hexdigest()
@@ -35,11 +37,36 @@ class CloudAPI:
     access_token: str
 
     def send_text(self, destination: str, text: str) -> str:
+        if not 1 <= len(text) <= 4000:
+            raise ProviderFailure("invalid_message")
+        return self._send(
+            destination, {"type": "text", "text": {"body": text, "preview_url": False}}
+        )
+
+    def send_reschedule(self, destination: str, parameters: list[str]) -> str:
+        return self._send(
+            destination,
+            {
+                "type": "template",
+                "template": {
+                    "name": "consulta_remarcada",
+                    "language": {"code": "pt_BR"},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [{"type": "text", "text": value} for value in parameters],
+                        }
+                    ],
+                },
+            },
+        )
+
+    def _send(self, destination: str, payload_fields: dict[str, Any]) -> str:
         if not re.fullmatch(r"v[0-9]{1,3}\.0", self.graph_version) or not re.fullmatch(
             r"[0-9]{1,80}", self.phone_number_id
         ):
             raise ProviderFailure("provider_configuration")
-        if not re.fullmatch(r"\+[1-9][0-9]{7,14}", destination) or not 1 <= len(text) <= 4000:
+        if not re.fullmatch(r"\+[1-9][0-9]{7,14}", destination):
             raise ProviderFailure("invalid_message")
         try:
             # Fixed hostname, TLS verification, bounded timeouts, no redirects/env proxies.
@@ -52,8 +79,7 @@ class CloudAPI:
                     json={
                         "messaging_product": "whatsapp",
                         "to": destination[1:],
-                        "type": "text",
-                        "text": {"body": text, "preview_url": False},
+                        **payload_fields,
                     },
                 )
         except (httpx.ConnectError, httpx.ConnectTimeout):

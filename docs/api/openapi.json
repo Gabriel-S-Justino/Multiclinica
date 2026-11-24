@@ -5067,6 +5067,17 @@
       },
       "AppointmentView": {
         "properties": {
+          "reschedule_notice_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reschedule Notice Status"
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -7078,6 +7089,11 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Version"
+          },
+          "whatsapp_notice_authorized": {
+            "type": "boolean",
+            "title": "Whatsapp Notice Authorized",
+            "default": false
           },
           "hold_id": {
             "type": "string",

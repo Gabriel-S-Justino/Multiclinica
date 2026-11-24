@@ -95,3 +95,24 @@ def test_network_error_is_ambiguous(monkeypatch):
 def test_configuration_cannot_select_another_host_or_recipient_scheme(version, number, destination):
     with pytest.raises(ProviderFailure):
         CloudAPI(number, version, uuid4().hex).send_text(destination, "Mensagem sintética")
+
+
+def test_reschedule_uses_approved_template_and_positional_body(monkeypatch):
+    captured = {}
+
+    def post(self, url, **kwargs):
+        captured.update(kwargs["json"])
+        return httpx.Response(200, json={"messages": [{"id": "wamid-test"}]})
+
+    monkeypatch.setattr(httpx.Client, "post", post)
+    parameters = ["Dra. Ana", "15/12/2026", "14:30"]
+    result = CloudAPI("100", "v1.0", uuid4().hex).send_reschedule("+15550000000", parameters)
+    assert result == "wamid-test"
+    assert captured["type"] == "template" and captured["to"] == "15550000000"
+    assert captured["template"] == {
+        "name": "consulta_remarcada",
+        "language": {"code": "pt_BR"},
+        "components": [
+            {"type": "body", "parameters": [{"type": "text", "text": p} for p in parameters]}
+        ],
+    }

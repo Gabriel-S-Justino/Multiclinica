@@ -11,3 +11,13 @@ Tenha à mão o acesso de administrador ao portal, uma fila de atendimento ativa
 Se o portal confirmar a URL e continuar sem receber eventos, peça à equipe para conferir se o app está inscrito na conta empresarial do número. [Aplicativos inscritos na WABA](https://developers.facebook.com/docs/graph-api/reference/whats-app-business-account/subscribed_apps/)
 
 A equipe Multiclinica acompanha o processamento e a entrega durante a homologação. [Guia do executor](worker-deployment.md) · [Implantação assistida](integration-onboarding.md)
+
+## Avisos de remarcação fora da janela de atendimento
+
+No gerenciador de modelos da conta WhatsApp Business, crie um modelo da categoria utilidade com nome `consulta_remarcada`, idioma `pt_BR` e apenas o corpo abaixo. Use variáveis posicionais e exemplos fictícios para a revisão da Meta.
+
+> Olá! Precisamos remarcar sua consulta com {{1}}. O novo horário é dia {{2}}, às {{3}} (horário da clínica). Se esse horário não funcionar para você, responda por aqui. Vamos ajudar!
+
+As variáveis são, nesta ordem, o nome do profissional do novo atendimento, o dia/mês/ano e a hora local da clínica. Aguarde a aprovação na conta de cada clínica antes de homologar o envio fora da janela. [Modelos do WhatsApp Business](https://developers.facebook.com/docs/graph-api/reference/whats-app-business-account/message_templates/)
+
+Na confirmação pelo portal, a equipe registra se a pessoa autorizou esse aviso. Com uma mensagem recebida do contato nas últimas 24 horas, o executor envia texto livre. Fora da janela, inclusive no primeiro contato ativo da clínica, o executor usa o modelo aprovado quando há autorização registrada. O pedido de parar mensagens, a perda do vínculo verificado e uma consulta que já foi substituída ou cancelada impedem o despacho. O resultado aparece nos detalhes da nova consulta. Se a Meta recusar o modelo, acompanhe a falha e contate a pessoa pelo canal combinado.
