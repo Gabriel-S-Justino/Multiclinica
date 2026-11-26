@@ -253,11 +253,12 @@ def test_ai_verification_classifies_failures(monkeypatch, caplog, failure, expec
     monkeypatch.setattr("backend.infrastructure.chat_intent.ChatIntent.interpret", fail)
     with pytest.raises(PortalError) as caught:
         service.verify("ai")
-    assert caught.value.args
+    assert caught.value.status == expected_status
     assert key not in caplog.text
     assert "AI verification" in caplog.text
     expected_code = (
         "provider_unavailable" if expected_status == 503 else "provider_verification_failed"
     )
-    assert expected_code in str(caught.value) or expected_code in caught.value.args
-    assert service.list()["items"][-1]["verification_status"] == "not_verified"
+    assert caught.value.code == expected_code
+    item = next(item for item in service.list()["items"] if item["provider"] == "ai")
+    assert item["verification_status"] == "not_verified"
