@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -448,11 +449,37 @@ class Integrations:
             )
             try:
                 sample = SafeTurn("Voltar ao menu", "MENU", frozenset(Intent))
-                raw = adapter.interpret(sample, timeout_seconds=5, max_output_tokens=128)
+                raw = adapter.interpret(sample, timeout_seconds=15, max_output_tokens=128)
                 IntentResult.model_validate_json(raw)
-            except httpx.RequestError:
+            except httpx.TimeoutException as exc:
+                logging.getLogger(__name__).warning(
+                    "AI verification timed out: provider=%s error_type=%s",
+                    values["provider"],
+                    type(exc).__name__,
+                )
                 raise PortalError("provider_unavailable", 503) from None
-            except (httpx.HTTPStatusError, KeyError, IndexError, TypeError, ValueError):
+            except httpx.RequestError as exc:
+                logging.getLogger(__name__).warning(
+                    "AI verification transport failure: provider=%s error_type=%s",
+                    values["provider"],
+                    type(exc).__name__,
+                )
+                raise PortalError("provider_unavailable", 503) from None
+            except httpx.HTTPStatusError as exc:
+                logging.getLogger(__name__).warning(
+                    "AI verification HTTP failure: provider=%s status=%d",
+                    values["provider"],
+                    exc.response.status_code,
+                )
+                if exc.response.status_code == 429 or exc.response.status_code >= 500:
+                    raise PortalError("provider_unavailable", 503) from None
+                raise PortalError("provider_verification_failed", 409) from None
+            except (KeyError, IndexError, TypeError, ValueError) as exc:
+                logging.getLogger(__name__).warning(
+                    "AI verification invalid response: provider=%s error_type=%s",
+                    values["provider"],
+                    type(exc).__name__,
+                )
                 raise PortalError("provider_verification_failed", 409) from None
         row.verified_version, row.verified_at = row.version, moment
         self.ctx.audit(f"integration.{provider}_verified", row.id)

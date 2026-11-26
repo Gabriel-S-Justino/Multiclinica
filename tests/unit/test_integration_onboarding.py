@@ -212,3 +212,53 @@ def test_custom_provider_verifies_model_and_requires_own_key_on_switch(monkeypat
     with pytest.raises(PortalError):
         service.verify("ai")
     assert ctx.db.rows[0].verified_version != ctx.db.rows[0].version
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_status"),
+    [
+        ("timeout", 503),
+        ("connection", 503),
+        (429, 503),
+        (503, 503),
+        (401, 409),
+        (404, 409),
+    ],
+)
+def test_ai_verification_classifies_failures(monkeypatch, caplog, failure, expected_status):
+    ctx = new_context()
+    ctx.validate = ctx.admin
+    service = Integrations(ctx)
+    key = secrets.token_hex(16)
+    service.save(
+        "ai",
+        IntegrationDraft(
+            version=0,
+            idempotency_key=str(uuid4()),
+            credentials={"provider": "gemini", "model": "synthetic-model", "api_key": key},
+        ),
+    )
+
+    def fail(self, turn, *, timeout_seconds, max_output_tokens):
+        assert timeout_seconds == 15
+        assert max_output_tokens == 128
+        request = httpx.Request("POST", self.url)
+        if failure == "timeout":
+            raise httpx.ReadTimeout(key, request=request)
+        if failure == "connection":
+            raise httpx.ConnectError(key, request=request)
+        response = httpx.Response(failure, request=request)
+        raise httpx.HTTPStatusError(key, request=request, response=response)
+
+    monkeypatch.setattr("backend.infrastructure.chat_intent.ChatIntent.interpret", fail)
+    with pytest.raises(PortalError) as caught:
+        service.verify("ai")
+    assert caught.value.status == expected_status
+    assert key not in caplog.text
+    assert "AI verification" in caplog.text
+    expected_code = (
+        "provider_unavailable" if expected_status == 503 else "provider_verification_failed"
+    )
+    assert caught.value.code == expected_code
+    item = next(item for item in service.list()["items"] if item["provider"] == "ai")
+    assert item["verification_status"] == "not_verified"
